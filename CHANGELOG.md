@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-10-19)
 
 - Remote displays on the venue Wi-Fi from the desktop app: QR code or link, no internet needed.
 - Remote displays anywhere with a room code over WebRTC (PeerJS).

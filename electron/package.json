@@ -1,7 +1,7 @@
 {
   "name": "stage-clock",
   "productName": "Stage Clock",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Event countdown timer with a rundown, wrap-up colors and a fullscreen speaker display.",
   "homepage": "https://github.com/David-Uka/stage-clock",
   "author": "David Uka",
@@ -25,6 +25,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "afterSign.js",
       "app/**/*",
       "node_modules/**/*"
     ],
@@ -46,12 +47,14 @@
     },
     "mac": {
       "icon": "app/icon-512.png",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "identity": null
     },
     "linux": {
       "icon": "app/icon-512.png",
       "category": "Utility"
-    }
+    },
+    "afterSign": "afterSign.js"
   },
   "dependencies": {
     "ws": "^8.18.0"

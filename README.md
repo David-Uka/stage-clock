@@ -20,7 +20,7 @@ All alerts are visual. The digits turn yellow, then red, then the screen flashes
 
 The builds are not code-signed yet.
 - **Windows:** if SmartScreen appears, click **More info → Run anyway**.
-- **macOS:** right-click the app → **Open**, or allow it under **System Settings → Privacy & Security → Open Anyway**. If macOS says the app is "damaged", run `xattr -dr com.apple.quarantine "/Applications/Stage Clock.app"` once.
+- **macOS:** the first open shows "Stage Clock Not Opened". Click **Done**, then go to **System Settings → Privacy & Security**, scroll to Security, and click **Open Anyway** next to Stage Clock. It never asks again.
 
 ## Features
 

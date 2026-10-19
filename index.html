@@ -379,6 +379,26 @@ body.output-mode #overlay { display: block; }
             </div>
           </div>
         </div>
+
+        <div class="eyebrow" style="margin:16px 0 6px">Anywhere · your own relay</div>
+        <p class="hint" style="margin:0 0 8px">Same idea as a room code, but through a relay server you run (see <code>relay/</code> in the repository: a free Cloudflare Worker). No third-party service involved.</p>
+        <div class="row">
+          <input type="text" id="relayUrl" placeholder="https://stage-clock-relay.example.workers.dev" style="flex:1 1 240px" aria-label="Relay URL">
+          <button class="btn" id="relayStart">Start relay room</button>
+        </div>
+        <span class="hint" id="relayError"></span>
+        <div id="relayOn" hidden>
+          <div class="row" style="align-items:flex-start; margin-top:8px">
+            <div class="qr" id="relayQr" aria-label="QR code for the relay display link"></div>
+            <div class="field" style="flex:1 1 220px">
+              <label>Room code</label>
+              <div class="roomcode" id="relayCode"></div>
+              <label for="relayLink">Display link</label>
+              <input type="text" id="relayLink" readonly>
+              <div class="row"><button class="btn small" id="relayCopy">Copy link</button><span class="hint" id="relayClients">No displays connected</span><button class="btn small danger" id="relayStop">Stop</button></div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -501,6 +521,7 @@ const DEFAULT_SETTINGS = {
   font: 'condensed', endStyle: 'flash', endText: "TIME'S UP",
   showTitle: true, showSpeaker: true, showClock: true, showNext: true, showProgress: true,
   clock24: true, hideHours: true,
+  relayUrl: '',
 };
 const SAMPLE_TIMERS = [
   { id: uid(), title: 'Welcome & housekeeping', speaker: 'Host', duration: 5 * 60, warnAt: 60, critAt: 30, mode: 'down', atZero: 'continue', trigger: 'manual', startAt: '', done: false },
@@ -657,6 +678,12 @@ function loadPeerJs() {
     document.head.appendChild(el);
   });
 }
+function relaySocketUrl(relay, code, role) {
+  const u = new URL(String(relay).trim());
+  u.protocol = u.protocol === 'http:' ? 'ws:' : u.protocol === 'https:' ? 'wss:' : u.protocol;
+  u.pathname = u.pathname.replace(/\/$/, '') + '/room/' + code; u.search = '?role=' + role; u.hash = '';
+  return u.toString();
+}
 function displayLink(params) {
   const base = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : PUBLIC_URL;
   return base + '?view=output&' + params;
@@ -671,8 +698,25 @@ if (IS_OUTPUT) {
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
   document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
-  const isRemote = PARAMS.has('lan') || PARAMS.has('room');
-  if (PARAMS.has('room')) {
+  const isRemote = PARAMS.has('lan') || PARAMS.has('room') || PARAMS.has('relay');
+  if (PARAMS.has('relay')) {
+    // Anywhere, through a relay the organiser runs: a plain WebSocket, same reconnect logic as the Wi-Fi path.
+    const code = normalizeCode(PARAMS.get('room'));
+    let target = null; try { target = code.length === 6 ? relaySocketUrl(PARAMS.get('relay'), code, 'display') : null; } catch (e) {}
+    if (!target) remote.label = 'This relay link is incomplete. It needs a relay address and a six-character room code.';
+    else {
+      remote.label = `Connecting to room ${code}…`;
+      let sock = null, retry = 1000;
+      const connect = () => {
+        try { sock = new WebSocket(target); } catch (e) { setTimeout(connect, retry); return; }
+        sock.onopen = () => { retry = 1000; remote.label = `Connected to room ${code}. Waiting for the controller…`; };
+        sock.onmessage = ev => { try { applyRemote(JSON.parse(ev.data)); } catch (e) {} };
+        sock.onclose = () => { remote.connected = false; remote.label = `Room ${code}: connection lost. Reconnecting…`; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+        sock.onerror = () => { try { sock.close(); } catch (e) {} };
+      };
+      connect();
+    }
+  } else if (PARAMS.has('room')) {
     // Anywhere: connect to the controller's room through PeerJS (WebRTC data channel).
     let code = normalizeCode(PARAMS.get('room'));
     const askForCode = () => {
@@ -1103,7 +1147,53 @@ $('#roomCopy').addEventListener('click', () => {
   navigator.clipboard?.writeText(v).then(() => { $('#roomCopy').textContent = 'Copied'; setTimeout(() => $('#roomCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#roomUrl').select(); });
 });
 try { const saved = sessionStorage.getItem('stage-clock-room'); if (saved && saved.length === 6) roomStart(saved); } catch (e) {}
-window.__stageClock = { room, remote };
+/* --- remote displays anywhere: through the organiser's own relay --- */
+const relay = { code: '', sock: null, sink: null, stopped: true };
+$('#relayUrl').value = state.settings.relayUrl || '';
+$('#relayUrl').addEventListener('change', () => { state.settings.relayUrl = $('#relayUrl').value.trim(); commit(); });
+function relayShow() {
+  $('#relayOn').hidden = false; $('#relayCode').textContent = relay.code;
+  const url = displayLink('relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url;
+  const box = $('#relayQr'); box.innerHTML = '';
+  if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
+}
+function relayStart(code) {
+  state.settings.relayUrl = $('#relayUrl').value.trim();
+  let target; try { if (!state.settings.relayUrl) throw new Error('Enter the relay address first.'); target = relaySocketUrl(state.settings.relayUrl, code || 'XXXXXX', 'controller'); } catch (e) { $('#relayError').textContent = e.message.startsWith('Enter') ? e.message : 'That relay address is not a valid URL.'; return; }
+  relay.code = code || Array.from({ length: 6 }, () => ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)]).join('');
+  relay.stopped = false; $('#relayError').textContent = 'Connecting…';
+  let retry = 1000;
+  const connect = () => {
+    if (relay.stopped) return;
+    try { relay.sock = new WebSocket(relaySocketUrl(state.settings.relayUrl, relay.code, 'controller')); } catch (e) { $('#relayError').textContent = 'Could not open the relay connection.'; return; }
+    relay.sock.onopen = () => {
+      retry = 1000; $('#relayError').textContent = '';
+      try { sessionStorage.setItem('stage-clock-relay-room', relay.code); } catch (e) {}
+      if (!relay.sink) { relay.sink = msg => { if (relay.sock && relay.sock.readyState === 1) relay.sock.send(JSON.stringify(msg)); }; remote.sinks.push(relay.sink); }
+      relayShow(); pushRemote();
+    };
+    relay.sock.onmessage = ev => { try { const m = JSON.parse(ev.data); if (m.type === 'clients') $('#relayClients').textContent = m.n === 0 ? 'No displays connected' : m.n === 1 ? '1 display connected' : `${m.n} displays connected`; } catch (e) {} };
+    relay.sock.onclose = () => { if (relay.stopped) return; $('#relayError').textContent = 'Relay connection lost. Reconnecting…'; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+    relay.sock.onerror = () => { try { relay.sock.close(); } catch (e) {} };
+  };
+  connect();
+}
+function relayStop() {
+  relay.stopped = true;
+  if (relay.sock) { try { relay.sock.onclose = null; relay.sock.close(); } catch (e) {} }
+  remote.sinks = remote.sinks.filter(fn => fn !== relay.sink);
+  relay.sock = null; relay.sink = null; relay.code = '';
+  try { sessionStorage.removeItem('stage-clock-relay-room'); } catch (e) {}
+  $('#relayOn').hidden = true; $('#relayError').textContent = '';
+}
+$('#relayStart').addEventListener('click', () => { relayStop(); relayStart(); });
+$('#relayStop').addEventListener('click', relayStop);
+$('#relayCopy').addEventListener('click', () => {
+  const v = $('#relayLink').value;
+  navigator.clipboard?.writeText(v).then(() => { $('#relayCopy').textContent = 'Copied'; setTimeout(() => $('#relayCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#relayLink').select(); });
+});
+try { const saved = sessionStorage.getItem('stage-clock-relay-room'); if (saved && saved.length === 6 && state.settings.relayUrl) relayStart(saved); } catch (e) {}
+window.__stageClock = { room, relay, remote };
 
 /* --- keep the screen awake while the controller is open --- */
 let wakeLock = null;

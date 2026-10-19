@@ -1,7 +1,7 @@
 {
   "name": "stage-clock",
   "productName": "Stage Clock",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Event countdown timer with a rundown, wrap-up colors and a fullscreen speaker display.",
   "homepage": "https://github.com/David-Uka/stage-clock",
   "author": "David Uka",
@@ -22,11 +22,35 @@
   "build": {
     "appId": "com.davidu.stageclock",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
-    "files": ["main.js", "app/**/*"],
-    "win": { "icon": "app/icon-512.png", "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "artifactName": "${productName}-${version}-win-setup.${ext}" },
-    "portable": { "artifactName": "${productName}-${version}-win-portable.${ext}" },
-    "mac": { "icon": "app/icon-512.png", "category": "public.app-category.productivity" },
-    "linux": { "icon": "app/icon-512.png", "category": "Utility" }
+    "files": [
+      "main.js",
+      "app/**/*"
+    ],
+    "win": {
+      "icon": "app/icon-512.png",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "artifactName": "${productName}-${version}-win-setup.${ext}"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-win-portable.${ext}"
+    },
+    "mac": {
+      "icon": "app/icon-512.png",
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
+    "linux": {
+      "icon": "app/icon-512.png",
+      "category": "Utility"
+    },
+    "afterSign": "afterSign.js"
   }
 }

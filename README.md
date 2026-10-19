@@ -18,7 +18,9 @@ All alerts are visual. The digits turn yellow, then red, then the screen flashes
 - **Windows, no download:** open the link above in Edge or Chrome and click the install icon in the address bar.
 - **Installer / portable .exe, macOS, Linux:** [latest release](https://github.com/David-Uka/stage-clock/releases/latest)
 
-The .exe is not code-signed yet. If SmartScreen appears, click **More info → Run anyway**.
+The builds are not code-signed yet.
+- **Windows:** if SmartScreen appears, click **More info → Run anyway**.
+- **macOS:** right-click the app → **Open**, or allow it under **System Settings → Privacy & Security → Open Anyway**. If macOS says the app is "damaged", run `xattr -dr com.apple.quarantine "/Applications/Stage Clock.app"` once.
 
 ## Features
 

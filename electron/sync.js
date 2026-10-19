@@ -5,4 +5,5 @@ fs.mkdirSync(dst, { recursive: true });
 for (const f of ['index.html', 'manifest.webmanifest', 'sw.js', 'icon.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png']) {
   fs.copyFileSync(path.join(src, f), path.join(dst, f));
 }
+fs.cpSync(path.join(src, 'vendor'), path.join(dst, 'vendor'), { recursive: true });
 console.log('synced web app into electron/app');

@@ -30,6 +30,10 @@ The .exe is not code-signed yet. If SmartScreen appears, click **More info → R
 - Start/pause, reset, next/previous, ±10 s and ±1 min while running, blackout, flash, messages to the speaker.
 - All colors and fonts adjustable. JSON import/export. Saves automatically.
 
+## Remote displays on the venue Wi-Fi
+
+The desktop app runs a small local server. Open **Remote displays** in the controller, and any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi can scan the QR code or open the link to show the speaker display. No internet needed. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.
+
 ## Shortcuts
 
 | Key | Action |

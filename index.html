@@ -216,6 +216,11 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output .o-message.green { color: #37d67a; } .output .o-message.red { color: #ff3b3b; }
 .output .o-message.flash { animation: msgflash 1s steps(2, start) infinite; }
 .output .o-blackout { position: absolute; inset: 0; background: #000; display: none; }
+.output .o-conn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 5cqh; color: var(--o-dim); display: none; text-align: center; padding: 2cqh 4cqw; }
+.output.no-source .o-conn { display: block; }
+.output.no-source .o-mid, .output.no-source .o-top, .output.no-source .o-bottom, .output.no-source .o-progress { visibility: hidden; }
+.qr { width: 148px; height: 148px; flex: none; background: #fff; padding: 8px; border-radius: 6px; }
+.qr svg { width: 100%; height: 100%; display: block; }
 .output.blackout .o-blackout { display: block; }
 .output.blackout .o-message { display: none; }
 
@@ -337,6 +342,23 @@ body.output-mode #overlay { display: block; }
           <button class="btn" id="btnMsgHide">Hide</button>
         </div>
       </div>
+
+      <div class="panel" id="remotePanel">
+        <h3>Remote displays</h3>
+        <div id="lanRemote" hidden>
+          <p class="hint" style="margin:0 0 10px">Any phone, tablet or laptop on this Wi-Fi can show the speaker display. Scan the code or open the link. No internet needed.</p>
+          <div class="row" style="align-items:flex-start">
+            <div class="qr" id="lanQr" aria-label="QR code for the display link"></div>
+            <div class="field" style="flex:1 1 220px">
+              <label for="lanUrl">Display link</label>
+              <input type="text" id="lanUrl" readonly>
+              <div class="row"><button class="btn small" id="lanCopy">Copy link</button><span class="hint" id="lanClients">No displays connected</span></div>
+              <select id="lanAddr" aria-label="Network address" hidden></select>
+            </div>
+          </div>
+        </div>
+        <p class="hint" id="lanUnavailable" style="margin:0">Remote displays over the venue Wi-Fi need the desktop app (Windows, macOS or Linux download). In the browser, use "Open display window" on this computer.</p>
+      </div>
     </section>
   </div>
 </div>
@@ -442,6 +464,7 @@ body.output-mode #overlay { display: block; }
   </div>
 </dialog>
 
+<script src="vendor/qrcode.js"></script>
 <script>
 (() => {
 'use strict';
@@ -525,12 +548,14 @@ const OUTPUT_HTML = `
   <div class="o-bottom"><div class="o-speaker"></div><div class="o-next"></div></div>
   <div class="o-progress"><i></i></div>
   <div class="o-message"></div>
-  <div class="o-blackout"></div>`;
+  <div class="o-blackout"></div>
+  <div class="o-conn"></div>`;
 function mountOutput(root) {
   root.innerHTML = OUTPUT_HTML;
   root._els = {
     title: $('.o-title', root), clock: $('.o-clock', root), time: $('.o-time', root), end: $('.o-endtext', root),
     speaker: $('.o-speaker', root), next: $('.o-next', root), bar: $('.o-progress i', root), msg: $('.o-message', root),
+    conn: $('.o-conn', root),
   };
   root._lastFlash = state.flashNonce;
   return root;
@@ -585,6 +610,21 @@ function renderOutput(root, s, now) {
   }
 }
 
+/* ============ REMOTE DISPLAYS: shared plumbing ============
+   A controller pushes { type: 'state', state, sentAt } to every "sink" on each change and on a heartbeat.
+   A remote display applies the message and keeps a clock offset so its own clock does not need to be right. */
+const remote = { sinks: [], clockOffset: 0, connected: false, label: '' };
+const nowMs = () => Date.now() + remote.clockOffset;
+function remoteMessage() { return { type: 'state', state, sentAt: Date.now() }; }
+function applyRemote(msg) {
+  if (!msg || msg.type !== 'state' || !msg.state || msg.state.v !== 1) return false;
+  state = msg.state; state.settings = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
+  if (typeof msg.sentAt === 'number') remote.clockOffset = msg.sentAt - Date.now();
+  remote.connected = true;
+  return true;
+}
+const PARAMS = new URLSearchParams(location.search);
+
 /* ============ OUTPUT-ONLY WINDOW (?view=output) ============ */
 if (IS_OUTPUT) {
   document.body.classList.add('output-mode');
@@ -592,11 +632,33 @@ if (IS_OUTPUT) {
   const root = mountOutput($('#bigOutput'));
   $('#btnExitOverlay').textContent = 'Full screen (F)';
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
-  if (bc) bc.onmessage = ev => { if (ev.data && ev.data.v === 1) state = ev.data; };
-  window.addEventListener('storage', ev => { if (ev.key === STORE_KEY && ev.newValue) { try { state = JSON.parse(ev.newValue); } catch (e) {} } });
   document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
-  const tick = () => { renderOutput(root, state, Date.now()); requestAnimationFrame(tick); };
+  const isRemote = PARAMS.has('lan');
+  if (!isRemote) {
+    // Same computer: follow the controller through the browser's own channels.
+    if (bc) bc.onmessage = ev => { if (ev.data && ev.data.v === 1) state = ev.data; };
+    window.addEventListener('storage', ev => { if (ev.key === STORE_KEY && ev.newValue) { try { state = JSON.parse(ev.newValue); } catch (e) {} } });
+  } else {
+    // Venue Wi-Fi: the desktop app serves this page and streams state over a WebSocket.
+    remote.label = 'Connecting to the controller…';
+    let sock = null, retry = 1000;
+    const connect = () => {
+      try { sock = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (e) { setTimeout(connect, retry); return; }
+      sock.onopen = () => { retry = 1000; remote.label = 'Connected. Waiting for the controller…'; };
+      sock.onmessage = ev => { try { applyRemote(JSON.parse(ev.data)); } catch (e) {} };
+      sock.onclose = () => { remote.connected = false; remote.label = 'Connection lost. Reconnecting…'; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+      sock.onerror = () => { try { sock.close(); } catch (e) {} };
+    };
+    connect();
+  }
+  window.__stageClock = { applyRemote, remote };
+  const tick = () => {
+    renderOutput(root, state, nowMs());
+    root.classList.toggle('no-source', isRemote && !remote.connected);
+    root._els.conn.textContent = remote.label;
+    requestAnimationFrame(tick);
+  };
   tick();
   return;
 }
@@ -610,8 +672,11 @@ let popout = null;
 function commit() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
   if (bc) bc.postMessage(state);
+  pushRemote();
   renderRundown(); renderControls();
 }
+function pushRemote() { if (!remote.sinks.length) return; const m = remoteMessage(); remote.sinks.forEach(fn => { try { fn(m); } catch (e) {} }); }
+setInterval(pushRemote, 2000); // heartbeat: late joiners and clock offset refresh
 
 /* --- transport --- */
 function selectTimer(id, { keepRunning = false } = {}) {
@@ -896,6 +961,32 @@ document.addEventListener('keydown', ev => {
   }
 });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && overlay.classList.contains('on')) overlay.classList.remove('on'); });
+
+/* --- remote displays over the venue Wi-Fi (desktop app only) --- */
+function setupLanRemote() {
+  const bridge = window.stageClock; if (!bridge || !bridge.lanInfo) return;
+  remote.sinks.push(msg => bridge.publish(msg));
+  bridge.lanInfo().then(info => {
+    if (!info || !info.urls || !info.urls.length) return;
+    $('#lanRemote').hidden = false; $('#lanUnavailable').hidden = true;
+    const sel = $('#lanAddr'); sel.innerHTML = '';
+    info.urls.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); });
+    sel.hidden = info.urls.length < 2;
+    const show = () => {
+      const url = sel.value + '/?view=output&lan=1'; $('#lanUrl').value = url;
+      const box = $('#lanQr'); box.innerHTML = '';
+      if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
+    };
+    sel.addEventListener('change', show); show();
+    pushRemote();
+  }).catch(() => {});
+  if (bridge.onClients) bridge.onClients(n => { $('#lanClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; });
+  $('#lanCopy').addEventListener('click', () => {
+    const v = $('#lanUrl').value;
+    navigator.clipboard?.writeText(v).then(() => { $('#lanCopy').textContent = 'Copied'; setTimeout(() => $('#lanCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#lanUrl').select(); });
+  });
+}
+setupLanRemote();
 
 /* --- keep the screen awake while the controller is open --- */
 let wakeLock = null;

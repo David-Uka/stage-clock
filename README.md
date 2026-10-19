@@ -22,7 +22,8 @@ The .exe is not code-signed yet. If SmartScreen appears, click **More info → R
 
 ## Features
 
-- One timer per speaker or segment, with title, speaker line, duration, count down or count up, overtime or stop at zero, auto-start next. Drag to reorder.
+- One timer per speaker or segment, with title, speaker line, duration, count down or count up, overtime or stop at zero. Drag to reorder.
+- Start each timer manually, when the previous one ends, or at a set time of day. Automatic starts fire even when the controller tab is in the background.
 - Per-timer yellow and red warning times.
 - Time's up: flash the screen red, solid red, blinking digits, or plain red digits. The text is editable.
 - Speaker display in its own window for the projector, or fullscreen in the same tab.

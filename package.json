@@ -1,0 +1,12 @@
+{
+  "name": "stage-clock-tests",
+  "private": true,
+  "description": "End-to-end tests for Stage Clock. The app itself is index.html and needs no build.",
+  "scripts": {
+    "test": "playwright test",
+    "serve": "python3 -m http.server 8080"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2"
+  }
+}

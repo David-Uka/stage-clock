@@ -678,7 +678,7 @@ let clockWorker = null;
 try {
   const src = 'setInterval(() => postMessage(Date.now()), 250);';
   clockWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-  clockWorker.onmessage = ev => engineStep(ev.data);
+  clockWorker.onmessage = () => engineStep(Date.now());
 } catch (e) { setInterval(() => engineStep(Date.now()), 250); }
 
 function tick() {

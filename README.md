@@ -1,4 +1,9 @@
-# Stage Clock
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/logo-dark.png">
+    <img src="docs/brand/logo-light.png" alt="Stage Clock" width="520">
+  </picture>
+</p>
 
 Free, open-source countdown timer for live events. Runs in the browser, installs as a Windows, macOS or Linux app, works offline. No account, no server, nothing leaves your machine.
 

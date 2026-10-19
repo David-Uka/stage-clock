@@ -21,7 +21,7 @@ jobs:
       - name: Collect the static site
         run: |
           mkdir -p site
-          cp index.html manifest.webmanifest sw.js icon.svg icon-192.png icon-512.png site/
+          cp index.html manifest.webmanifest sw.js icon.svg icon-192.png icon-512.png icon-maskable-512.png site/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

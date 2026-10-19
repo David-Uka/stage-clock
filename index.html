@@ -60,7 +60,9 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand .mark { flex: none; }
+.brand .red { color: var(--crit); }
 .brand h1 { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .02em; }
 .brand .clock { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .topbar .spacer { flex: 1; }
@@ -252,7 +254,8 @@ body.output-mode #overlay { display: block; }
 <div id="controller">
   <header class="topbar">
     <div class="brand">
-      <h1>STAGE CLOCK</h1>
+      <svg class="mark" viewBox="0 0 120 120" width="26" height="26" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#2a323b" stroke-width="12"/><circle cx="60" cy="60" r="44" fill="none" stroke="#ff2d2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="193.4 276.5" transform="rotate(-90 60 60)"/><path d="M60 32v28l18 14" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h1>STAGE <span class="red">CLOCK</span></h1>
       <span class="clock" id="topClock">00:00:00</span>
     </div>
     <div class="spacer"></div>

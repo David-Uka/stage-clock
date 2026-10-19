@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Remote displays on the venue Wi-Fi from the desktop app: QR code or link, no internet needed.
+- Remote displays anywhere with a room code over WebRTC (PeerJS).
+
 ## 1.1.1 (2026-10-19)
 
 - macOS build is ad-hoc signed so it no longer reports "damaged and can't be opened". It still needs right-click → Open the first time.

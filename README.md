@@ -36,6 +36,10 @@ The builds are not code-signed yet.
 
 The desktop app runs a small local server. Open **Remote displays** in the controller, and any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi can scan the QR code or open the link to show the speaker display. No internet needed. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.
 
+## Remote displays anywhere with a room code
+
+In **Remote displays**, click **Start a room**. The display device opens the link, scans the QR code, or opens <https://david-uka.github.io/stage-clock/?view=output&room=> and types the six-character code. Both ends need internet. The devices connect to each other directly over WebRTC; the public PeerJS service only introduces them and never sees the timer data.
+
 ## Shortcuts
 
 | Key | Action |

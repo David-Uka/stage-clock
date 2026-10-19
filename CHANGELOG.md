@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Remote control from a phone over all three transports (venue Wi-Fi, room code, your own relay), protected by a four-digit PIN shown on the controller.
+- Every remote QR code and link can be switched between display and remote control.
+
 ## 1.2.0 (2026-10-19)
 
 - Remote displays on the venue Wi-Fi from the desktop app: QR code or link, no internet needed.

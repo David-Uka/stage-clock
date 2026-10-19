@@ -14,7 +14,8 @@ export default {
     if (!m) return json({ error: 'not found' }, 404);
     const code = m[1].toUpperCase();
     if (!CODE.test(code)) return json({ error: 'room code must be 6 letters or digits' }, 400);
-    const role = url.searchParams.get('role') === 'controller' ? 'controller' : 'display';
+    const requested = url.searchParams.get('role');
+    const role = requested === 'controller' ? 'controller' : requested === 'remote' ? 'remote' : 'display';
     if (request.headers.get('Upgrade') !== 'websocket') return json({ error: 'expected a WebSocket upgrade' }, 426);
     const id = env.ROOMS.idFromName(code);
     return env.ROOMS.get(id).fetch(new Request(`https://room/${code}?role=${role}`, request));
@@ -28,8 +29,10 @@ export class Room {
     const role = new URL(request.url).searchParams.get('role');
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
-    this.ctx.acceptWebSocket(server, [role]);
-    if (role === 'display') {
+    // Tags: the role, and a unique id so a controller's reply can be routed back to one remote.
+    const id = 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    this.ctx.acceptWebSocket(server, [role, id]);
+    if (role === 'display' || role === 'remote') {
       const last = await this.ctx.storage.get('last');
       if (last) server.send(last);
     }
@@ -39,12 +42,26 @@ export class Room {
 
   async webSocketMessage(ws, message) {
     if (typeof message !== 'string' || message.length > MAX_MESSAGE) return;
-    const [role] = this.ctx.getTags(ws);
-    if (role !== 'controller') return;
+    const [role, id] = this.ctx.getTags(ws);
     let parsed; try { parsed = JSON.parse(message); } catch (e) { return; }
-    if (!parsed || parsed.type !== 'state') return;
+    if (!parsed || typeof parsed !== 'object') return;
+    if (role === 'remote') {
+      // A phone remote may only send commands, and each carries the sender's id for the reply.
+      if (parsed.type !== 'command') return;
+      const out = JSON.stringify({ ...parsed, from: id });
+      for (const c of this.ctx.getWebSockets('controller')) { try { c.send(out); } catch (e) {} }
+      return;
+    }
+    if (role !== 'controller') return;
+    if (parsed.type === 'reply' && typeof parsed.to === 'string' && parsed.msg) {
+      const out = JSON.stringify(parsed.msg);
+      for (const r of this.ctx.getWebSockets(parsed.to)) { try { r.send(out); } catch (e) {} }
+      return;
+    }
+    if (parsed.type !== 'state') return;
     await this.ctx.storage.put('last', message);
     for (const d of this.ctx.getWebSockets('display')) { try { d.send(message); } catch (e) {} }
+    for (const r of this.ctx.getWebSockets('remote')) { try { r.send(message); } catch (e) {} }
   }
 
   webSocketClose(ws) { try { ws.close(); } catch (e) {} this.sendClientCount(ws); }
@@ -52,7 +69,7 @@ export class Room {
 
   // `closing` is still listed by getWebSockets() while its close handler runs, so leave it out.
   sendClientCount(closing = null) {
-    const n = this.ctx.getWebSockets('display').filter(s => s !== closing).length;
+    const n = [...this.ctx.getWebSockets('display'), ...this.ctx.getWebSockets('remote')].filter(s => s !== closing).length;
     const msg = JSON.stringify({ type: 'clients', n });
     for (const c of this.ctx.getWebSockets('controller')) { try { c.send(msg); } catch (e) {} }
   }

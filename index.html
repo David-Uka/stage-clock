@@ -255,6 +255,29 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 #overlay .exit { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2; opacity: .35; transition: opacity .2s; }
 #overlay:hover .exit, #overlay .exit:focus-visible { opacity: 1; }
 body.output-mode #controller { display: none; }
+body.remote-mode #controller, body.remote-mode #overlay { display: none !important; }
+#remoteView { display: none; min-height: 100%; flex-direction: column; gap: 14px; padding-block: 12px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 560px; margin: 0 auto; }
+body.remote-mode { overflow: auto; }
+body.remote-mode #remoteView { display: flex; }
+.r-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.r-head .brand h1 { font-size: 16px; }
+.r-now { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; text-align: center; }
+.r-title { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-time { font-family: var(--font-cond); font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
+.r-time.warn { color: var(--warn); } .r-time.crit, .r-time.over { color: var(--crit); }
+.r-sub { color: var(--muted); font-size: 13px; min-height: 1.3em; }
+.r-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.r-grid .btn { padding: 18px 10px; font-size: 17px; }
+.r-grid .span2 { grid-column: span 2; }
+.r-pin { display: flex; align-items: center; gap: 10px; }
+.r-pin input { width: 6em; font-family: var(--font-mono); font-size: 18px; letter-spacing: .3em; text-align: center; }
+.r-conn { color: var(--muted); font-size: 13px; text-align: center; min-height: 1.3em; }
+.r-conn.bad { color: #ffb3b3; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
+.seg button { background: var(--panel-2); border: 0; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.pinbox { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
+.pinbox b { font-family: var(--font-mono); font-size: 16px; letter-spacing: .2em; color: var(--fg); }
 body.output-mode #overlay { display: block; }
 </style>
 </head>
@@ -348,14 +371,16 @@ body.output-mode #overlay { display: block; }
       </div>
 
       <div class="panel" id="remotePanel">
-        <h3>Remote displays</h3>
+        <div class="row" style="margin-bottom:6px"><h3 style="margin:0">Remote displays &amp; remote control</h3><span class="pinbox" title="Phones need this PIN to control the timer. Watching needs no PIN.">Control PIN <b id="pinValue"></b><button class="btn small" id="pinNew">New PIN</button></span></div>
+        <p class="hint" style="margin:0 0 10px">Every link below can open as a <b>display</b> (just watches) or as a <b>remote control</b> (a phone page with Start, Next, +1 min and the rest; needs the PIN).</p>
         <div class="eyebrow" style="margin-bottom:6px">On the venue Wi-Fi · desktop app</div>
         <div id="lanRemote" hidden>
           <p class="hint" style="margin:0 0 10px">Any phone, tablet or laptop on this Wi-Fi can show the speaker display. Scan the code or open the link. No internet needed.</p>
+          <div class="seg" data-seg="lan"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
           <div class="row" style="align-items:flex-start">
-            <div class="qr" id="lanQr" aria-label="QR code for the display link"></div>
+            <div class="qr" id="lanQr" aria-label="QR code for the link"></div>
             <div class="field" style="flex:1 1 220px">
-              <label for="lanUrl">Display link</label>
+              <label for="lanUrl">Link</label>
               <input type="text" id="lanUrl" readonly>
               <div class="row"><button class="btn small" id="lanCopy">Copy link</button><span class="hint" id="lanClients">No displays connected</span></div>
               <select id="lanAddr" aria-label="Network address" hidden></select>
@@ -368,12 +393,13 @@ body.output-mode #overlay { display: block; }
         <p class="hint" style="margin:0 0 8px">Needs internet on both ends. The display opens the link or enters the code at the Stage Clock website. Devices connect to each other directly; the public PeerJS service only introduces them.</p>
         <div class="row" id="roomOff"><button class="btn" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
         <div id="roomOn" hidden>
+          <div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
           <div class="row" style="align-items:flex-start">
             <div class="qr" id="roomQr" aria-label="QR code for the room link"></div>
             <div class="field" style="flex:1 1 220px">
               <label>Room code</label>
               <div class="roomcode" id="roomCode"></div>
-              <label for="roomUrl">Display link</label>
+              <label for="roomUrl">Link</label>
               <input type="text" id="roomUrl" readonly>
               <div class="row"><button class="btn small" id="roomCopy">Copy link</button><span class="hint" id="roomClients">No displays connected</span><button class="btn small danger" id="roomStop">Stop room</button></div>
             </div>
@@ -388,12 +414,13 @@ body.output-mode #overlay { display: block; }
         </div>
         <span class="hint" id="relayError"></span>
         <div id="relayOn" hidden>
-          <div class="row" style="align-items:flex-start; margin-top:8px">
-            <div class="qr" id="relayQr" aria-label="QR code for the relay display link"></div>
+          <div class="seg" data-seg="relay" style="margin-top:8px"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
+          <div class="row" style="align-items:flex-start">
+            <div class="qr" id="relayQr" aria-label="QR code for the relay link"></div>
             <div class="field" style="flex:1 1 220px">
               <label>Room code</label>
               <div class="roomcode" id="relayCode"></div>
-              <label for="relayLink">Display link</label>
+              <label for="relayLink">Link</label>
               <input type="text" id="relayLink" readonly>
               <div class="row"><button class="btn small" id="relayCopy">Copy link</button><span class="hint" id="relayClients">No displays connected</span><button class="btn small danger" id="relayStop">Stop</button></div>
             </div>
@@ -405,6 +432,41 @@ body.output-mode #overlay { display: block; }
 </div>
 
 <div id="overlay"><div class="output" id="bigOutput"></div><button class="btn exit" id="btnExitOverlay">Exit (Esc)</button></div>
+
+<div id="remoteView">
+  <header class="r-head">
+    <div class="brand"><svg class="mark" viewBox="0 0 120 120" width="22" height="22" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#2a323b" stroke-width="12"/><circle cx="60" cy="60" r="44" fill="none" stroke="#ff2d2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="193.4 276.5" transform="rotate(-90 60 60)"/><path d="M60 32v28l18 14" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg><h1>STAGE <span class="red">CLOCK</span> · Remote</h1></div>
+    <span class="hint" id="rClock"></span>
+  </header>
+  <div class="r-now">
+    <div class="r-title" id="rTitle">Waiting for the controller…</div>
+    <div class="r-time" id="rTime">--:--</div>
+    <div class="r-sub" id="rSub"></div>
+  </div>
+  <div class="r-pin">
+    <label for="rPin">Control PIN</label>
+    <input type="text" id="rPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····">
+    <span class="hint" id="rPinMsg">Shown on the controller</span>
+  </div>
+  <div class="r-grid">
+    <button class="btn primary span2" data-cmd="play" id="rPlay">Start</button>
+    <button class="btn" data-cmd="prev">◂ Prev</button>
+    <button class="btn" data-cmd="next">Next ▸</button>
+    <button class="btn" data-cmd="nudge" data-value="-60">−1 min</button>
+    <button class="btn" data-cmd="nudge" data-value="60">+1 min</button>
+    <button class="btn" data-cmd="nudge" data-value="-10">−10 s</button>
+    <button class="btn" data-cmd="nudge" data-value="10">+10 s</button>
+    <button class="btn" data-cmd="reset">Reset</button>
+    <button class="btn toggle" data-cmd="blackout" id="rBlackout" aria-pressed="false">Blackout</button>
+    <button class="btn span2" data-cmd="flash">Flash the display</button>
+  </div>
+  <div class="row">
+    <input type="text" id="rMsgText" placeholder="Message to speaker" style="flex:1 1 160px" maxlength="200">
+    <button class="btn primary" data-cmd="message">Show</button>
+    <button class="btn" data-cmd="hideMessage">Hide</button>
+  </div>
+  <div class="r-conn" id="rConn"></div>
+</div>
 
 <dialog id="timerDialog">
   <h2 id="timerDialogTitle">Add timer</h2>
@@ -535,7 +597,7 @@ function freshState() {
     v: 1, timers: SAMPLE_TIMERS.map(t => ({ ...t })), activeId: SAMPLE_TIMERS[0].id,
     running: false, endAt: 0, remainingMs: SAMPLE_TIMERS[0].duration * 1000,
     message: { text: '', color: 'white', bold: false, upper: false, flash: false, on: false },
-    blackout: false, flashNonce: 0, settings: { ...DEFAULT_SETTINGS },
+    blackout: false, flashNonce: 0, settings: { ...DEFAULT_SETTINGS }, pin: newPin(),
   };
 }
 function loadState() {
@@ -543,6 +605,7 @@ function loadState() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const s = JSON.parse(raw); s.settings = { ...DEFAULT_SETTINGS, ...(s.settings || {}) };
+      if (!/^\d{4}$/.test(s.pin || '')) s.pin = newPin();
       s.timers.forEach((t, i) => {
         if (!t.trigger) t.trigger = 'manual';
         if (t.startAt === undefined) t.startAt = '';
@@ -558,7 +621,10 @@ let state = loadState();
 let bc = null;
 try { bc = new BroadcastChannel(CHANNEL); } catch (e) { bc = null; }
 
-const IS_OUTPUT = new URLSearchParams(location.search).get('view') === 'output';
+const VIEW = new URLSearchParams(location.search).get('view');
+const IS_OUTPUT = VIEW === 'output';
+const IS_REMOTE_VIEW = VIEW === 'remote';
+function newPin() { return String(Math.floor(1000 + Math.random() * 9000)); }   // hoisted: used by freshState above
 
 /* ---------- time helpers ---------- */
 function activeTimer(s = state) { return s.timers.find(t => t.id === s.activeId) || null; }
@@ -602,6 +668,20 @@ function mountOutput(root) {
   root._lastFlash = state.flashNonce;
   return root;
 }
+function describe(s, now) {
+  const st = s.settings, t = activeTimer(s);
+  if (!t) return { t: null, phase: 'normal', text: '--:--', endText: '', frac: 0, rem: 0 };
+  const rem = remainingMs(s, now), durMs = t.duration * 1000;
+  let phase = 'normal', text, endText = '';
+  if (rem <= 0) phase = 'over'; else if (rem <= t.critAt * 1000) phase = 'crit'; else if (rem <= t.warnAt * 1000) phase = 'warn';
+  if (t.mode === 'up') text = fmtClock(durMs - rem, st.hideHours, Math.floor);
+  else if (rem <= 0 && t.atZero === 'continue') text = '+' + fmtClock(-rem, st.hideHours);
+  else text = fmtClock(Math.max(0, rem), st.hideHours);
+  if (phase === 'over') endText = st.endText || '';
+  else if (!s.running && t.trigger === 'scheduled' && !t.done && todayAt(t.startAt, now) > now) endText = `Starts at ${t.startAt}`;
+  const frac = durMs > 0 ? Math.min(1, Math.max(0, rem / durMs)) : 0;
+  return { t, phase, text, endText, frac, rem };
+}
 function renderOutput(root, s, now) {
   const e = root._els; if (!e) return;
   const st = s.settings, t = activeTimer(s);
@@ -614,22 +694,8 @@ function renderOutput(root, s, now) {
   root.classList.toggle('blackout', !!s.blackout);
   e.clock.textContent = fmtTod(new Date(now), st.clock24);
 
-  let phase = 'normal', text = '--:--', endText = '', frac = 0;
+  const { phase, text, endText, frac } = describe(s, now);
   if (t) {
-    const rem = remainingMs(s, now), durMs = t.duration * 1000;
-    if (rem <= 0) phase = 'over';
-    else if (rem <= t.critAt * 1000) phase = 'crit';
-    else if (rem <= t.warnAt * 1000) phase = 'warn';
-    if (t.mode === 'up') {
-      text = fmtClock(durMs - rem, st.hideHours, Math.floor);
-    } else if (rem <= 0 && t.atZero === 'continue') {
-      text = '+' + fmtClock(-rem, st.hideHours);
-    } else {
-      text = fmtClock(Math.max(0, rem), st.hideHours);
-    }
-    if (phase === 'over') endText = st.endText || '';
-    else if (!s.running && t.trigger === 'scheduled' && !t.done && todayAt(t.startAt, now) > now) endText = `Starts at ${t.startAt}`;
-    frac = durMs > 0 ? Math.min(1, Math.max(0, rem / durMs)) : 0;
     e.title.textContent = t.title; e.speaker.textContent = t.speaker || '';
     const idx = s.timers.findIndex(x => x.id === t.id); const nx = s.timers[idx + 1];
     e.next.innerHTML = nx ? `Next: <b></b> · ${fmtDur(nx.duration)}` : '';
@@ -657,7 +723,66 @@ function renderOutput(root, s, now) {
    A remote display applies the message and keeps a clock offset so its own clock does not need to be right. */
 const remote = { sinks: [], clockOffset: 0, connected: false, label: '' };
 const nowMs = () => Date.now() + remote.clockOffset;
-function remoteMessage() { return { type: 'state', state, sentAt: Date.now() }; }
+function remoteMessage() { const { pin, ...safe } = state; return { type: 'state', state: safe, sentAt: Date.now() }; }
+function askForCode(container) {
+  remote.label = '';
+  container.innerHTML = '<div>Enter the room code shown on the controller</div><form><input id="roomInput" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="submit">Join</button></form>';
+  $('form', container).addEventListener('submit', ev => { ev.preventDefault(); const c = normalizeCode($('#roomInput').value); if (c.length === 6) { const u = new URL(location.href); u.searchParams.set('room', c); location.href = u.toString(); } });
+  $('#roomInput').focus();
+}
+/* Connects a display or a phone remote to the controller over whichever transport the link names.
+   Returns { send(msg) }. Messages from the controller go to onMessage; status text goes to remote.label. */
+function openClientTransport({ role, onMessage, codeContainer }) {
+  const api = { send: () => false, kind: 'none' };
+  const wsTransport = (makeUrl, label) => {
+    let sock = null, retry = 1000;
+    const connect = () => {
+      try { sock = new WebSocket(makeUrl()); } catch (e) { setTimeout(connect, retry); return; }
+      sock.onopen = () => { retry = 1000; remote.label = `${label}. Waiting for the controller…`; };
+      sock.onmessage = ev => { try { onMessage(JSON.parse(ev.data)); } catch (e) {} };
+      sock.onclose = () => { remote.connected = false; remote.label = 'Connection lost. Reconnecting…'; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+      sock.onerror = () => { try { sock.close(); } catch (e) {} };
+    };
+    api.send = msg => { if (sock && sock.readyState === 1) { sock.send(JSON.stringify(msg)); return true; } return false; };
+    connect();
+  };
+  if (PARAMS.has('relay')) {
+    api.kind = 'relay';
+    const code = normalizeCode(PARAMS.get('room'));
+    let target = null; try { target = code.length === 6 ? relaySocketUrl(PARAMS.get('relay'), code, role) : null; } catch (e) {}
+    if (!target) { remote.label = 'This relay link is incomplete. It needs a relay address and a six-character room code.'; return api; }
+    remote.label = `Connecting to room ${code}…`;
+    wsTransport(() => target, `Connected to room ${code}`);
+  } else if (PARAMS.has('room')) {
+    api.kind = 'room';
+    const code = normalizeCode(PARAMS.get('room'));
+    if (code.length !== 6) { askForCode(codeContainer); return api; }
+    remote.label = `Connecting to room ${code}…`;
+    let peer = null, conn = null, retry = 2000;
+    const connect = () => {
+      try { conn = peer.connect(peerId(code), { reliable: true, serialization: 'json' }); } catch (e) { setTimeout(connect, retry); return; }
+      conn.on('open', () => { retry = 2000; remote.label = `Connected to room ${code}. Waiting for the controller…`; });
+      conn.on('data', msg => onMessage(msg));
+      conn.on('close', () => { remote.connected = false; remote.label = `Room ${code}: connection lost. Reconnecting…`; setTimeout(connect, retry); retry = Math.min(retry * 2, 15000); });
+      conn.on('error', () => {});
+    };
+    api.send = msg => { if (conn && conn.open) { conn.send(msg); return true; } return false; };
+    loadPeerJs().then(() => {
+      peer = new Peer();
+      peer.on('open', connect);
+      peer.on('error', err => {
+        if (err && err.type === 'peer-unavailable') { remote.connected = false; remote.label = `Room ${code} is not open. Start it on the controller, then this screen will connect.`; setTimeout(connect, 5000); }
+        else { remote.label = `Connection problem (${err && err.type || 'unknown'}). Retrying…`; }
+      });
+      peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+    }).catch(e => { remote.label = e.message; });
+  } else if (PARAMS.has('lan')) {
+    api.kind = 'lan';
+    remote.label = 'Connecting to the controller…';
+    wsTransport(() => (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws', 'Connected');
+  }
+  return api;
+}
 function applyRemote(msg) {
   if (!msg || msg.type !== 'state' || !msg.state || msg.state.v !== 1) return false;
   state = msg.state; state.settings = { ...DEFAULT_SETTINGS, ...(state.settings || {}) };
@@ -684,9 +809,9 @@ function relaySocketUrl(relay, code, role) {
   u.pathname = u.pathname.replace(/\/$/, '') + '/room/' + code; u.search = '?role=' + role; u.hash = '';
   return u.toString();
 }
-function displayLink(params) {
+function viewLink(view, params) {
   const base = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : PUBLIC_URL;
-  return base + '?view=output&' + params;
+  return base + '?view=' + view + '&' + params;
 }
 
 /* ============ OUTPUT-ONLY WINDOW (?view=output) ============ */
@@ -699,75 +824,71 @@ if (IS_OUTPUT) {
   document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
   const isRemote = PARAMS.has('lan') || PARAMS.has('room') || PARAMS.has('relay');
-  if (PARAMS.has('relay')) {
-    // Anywhere, through a relay the organiser runs: a plain WebSocket, same reconnect logic as the Wi-Fi path.
-    const code = normalizeCode(PARAMS.get('room'));
-    let target = null; try { target = code.length === 6 ? relaySocketUrl(PARAMS.get('relay'), code, 'display') : null; } catch (e) {}
-    if (!target) remote.label = 'This relay link is incomplete. It needs a relay address and a six-character room code.';
-    else {
-      remote.label = `Connecting to room ${code}…`;
-      let sock = null, retry = 1000;
-      const connect = () => {
-        try { sock = new WebSocket(target); } catch (e) { setTimeout(connect, retry); return; }
-        sock.onopen = () => { retry = 1000; remote.label = `Connected to room ${code}. Waiting for the controller…`; };
-        sock.onmessage = ev => { try { applyRemote(JSON.parse(ev.data)); } catch (e) {} };
-        sock.onclose = () => { remote.connected = false; remote.label = `Room ${code}: connection lost. Reconnecting…`; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
-        sock.onerror = () => { try { sock.close(); } catch (e) {} };
-      };
-      connect();
-    }
-  } else if (PARAMS.has('room')) {
-    // Anywhere: connect to the controller's room through PeerJS (WebRTC data channel).
-    let code = normalizeCode(PARAMS.get('room'));
-    const askForCode = () => {
-      remote.label = '';
-      root._els.conn.innerHTML = '<div>Enter the room code shown on the controller</div><form><input id="roomInput" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="submit">Join</button></form>';
-      $('form', root._els.conn).addEventListener('submit', ev => { ev.preventDefault(); const c = normalizeCode($('#roomInput').value); if (c.length === 6) { const u = new URL(location.href); u.searchParams.set('room', c); location.href = u.toString(); } });
-      $('#roomInput').focus();
-    };
-    if (code.length !== 6) askForCode();
-    else {
-      remote.label = `Connecting to room ${code}…`;
-      let peer = null, conn = null, retry = 2000;
-      const connect = () => {
-        try { conn = peer.connect(peerId(code), { reliable: true, serialization: 'json' }); } catch (e) { setTimeout(connect, retry); return; }
-        conn.on('open', () => { retry = 2000; remote.label = `Connected to room ${code}. Waiting for the controller…`; });
-        conn.on('data', msg => applyRemote(msg));
-        conn.on('close', () => { remote.connected = false; remote.label = `Room ${code}: connection lost. Reconnecting…`; setTimeout(connect, retry); retry = Math.min(retry * 2, 15000); });
-        conn.on('error', () => {});
-      };
-      loadPeerJs().then(() => {
-        peer = new Peer();
-        peer.on('open', connect);
-        peer.on('error', err => {
-          if (err && err.type === 'peer-unavailable') { remote.connected = false; remote.label = `Room ${code} is not open. Start it on the controller, then this screen will connect.`; setTimeout(connect, 5000); }
-          else { remote.label = `Connection problem (${err && err.type || 'unknown'}). Retrying…`; }
-        });
-        peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
-      }).catch(e => { remote.label = e.message; });
-    }
-  } else if (!isRemote) {
+  if (!isRemote) {
     // Same computer: follow the controller through the browser's own channels.
     if (bc) bc.onmessage = ev => { if (ev.data && ev.data.v === 1) state = ev.data; };
     window.addEventListener('storage', ev => { if (ev.key === STORE_KEY && ev.newValue) { try { state = JSON.parse(ev.newValue); } catch (e) {} } });
   } else {
-    // Venue Wi-Fi: the desktop app serves this page and streams state over a WebSocket.
-    remote.label = 'Connecting to the controller…';
-    let sock = null, retry = 1000;
-    const connect = () => {
-      try { sock = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws'); } catch (e) { setTimeout(connect, retry); return; }
-      sock.onopen = () => { retry = 1000; remote.label = 'Connected. Waiting for the controller…'; };
-      sock.onmessage = ev => { try { applyRemote(JSON.parse(ev.data)); } catch (e) {} };
-      sock.onclose = () => { remote.connected = false; remote.label = 'Connection lost. Reconnecting…'; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
-      sock.onerror = () => { try { sock.close(); } catch (e) {} };
-    };
-    connect();
+    openClientTransport({ role: 'display', onMessage: applyRemote, codeContainer: root._els.conn });
   }
   window.__stageClock = { applyRemote, remote };
   const tick = () => {
     renderOutput(root, state, nowMs());
     root.classList.toggle('no-source', isRemote && !remote.connected);
     if (remote.label) root._els.conn.textContent = remote.label;
+    requestAnimationFrame(tick);
+  };
+  tick();
+  return;
+}
+
+/* ============ PHONE REMOTE (?view=remote) ============ */
+if (IS_REMOTE_VIEW) {
+  document.body.classList.add('remote-mode');
+  document.title = 'Stage Clock · Remote';
+  const pending = new Map();
+  let lastAck = '';
+  const transport = openClientTransport({
+    role: 'remote', codeContainer: $('#rConn'),
+    onMessage: msg => {
+      if (!msg) return;
+      if (msg.type === 'state') applyRemote(msg);
+      else if (msg.type === 'ack') {
+        pending.delete(msg.id);
+        lastAck = msg.ok ? '' : (msg.reason || 'Not allowed');
+        $('#rPinMsg').textContent = msg.ok ? 'PIN accepted' : (msg.reason || 'Not allowed');
+        $('#rPinMsg').style.color = msg.ok ? '' : '#ffb3b3';
+      }
+    },
+  });
+  try { $('#rPin').value = sessionStorage.getItem('stage-clock-pin') || ''; } catch (e) {}
+  $('#rPin').addEventListener('input', () => { try { sessionStorage.setItem('stage-clock-pin', $('#rPin').value); } catch (e) {} });
+  function sendCommand(action, value) {
+    const pin = $('#rPin').value.trim();
+    if (!/^\d{4}$/.test(pin)) { $('#rPinMsg').textContent = 'Enter the 4-digit PIN from the controller'; $('#rPinMsg').style.color = '#ffb3b3'; $('#rPin').focus(); return; }
+    const id = uid(); const msg = { type: 'command', id, action, value, pin };
+    if (!transport.send(msg)) { $('#rConn').textContent = 'Not connected yet.'; return; }
+    pending.set(id, Date.now());
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+  }
+  $$('#remoteView [data-cmd]').forEach(b => b.addEventListener('click', () => {
+    const a = b.dataset.cmd;
+    if (a === 'nudge') sendCommand('nudge', parseInt(b.dataset.value, 10));
+    else if (a === 'message') sendCommand('message', { text: $('#rMsgText').value.trim() });
+    else sendCommand(a);
+  }));
+  $('#rMsgText').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); sendCommand('message', { text: $('#rMsgText').value.trim() }); } });
+  window.__stageClock = { applyRemote, remote, sendCommand };
+  const tick = () => {
+    const now = nowMs(), d = describe(state, now);
+    $('#rClock').textContent = fmtTod(new Date(now), state.settings.clock24);
+    if (remote.connected && d.t) {
+      $('#rTitle').textContent = d.t.title; $('#rTime').textContent = d.text; $('#rTime').className = 'r-time ' + d.phase;
+      $('#rSub').textContent = d.endText || (state.running ? 'Running' : 'Paused') + (d.t.speaker ? ' · ' + d.t.speaker : '');
+      $('#rPlay').textContent = state.running ? 'Pause' : 'Start';
+      $('#rBlackout').setAttribute('aria-pressed', String(!!state.blackout));
+    } else if (remote.connected) { $('#rTitle').textContent = 'No timer loaded'; $('#rTime').textContent = '--:--'; $('#rSub').textContent = ''; }
+    const c = $('#rConn'); if (remote.label) { c.textContent = remote.label; c.classList.toggle('bad', !remote.connected); }
     requestAnimationFrame(tick);
   };
   tick();
@@ -827,6 +948,36 @@ function showOverlay(on) {
   if (on) { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {} }
   else if (document.fullscreenElement) { try { document.exitFullscreen().catch(() => {}); } catch (e) {} }
 }
+
+/* --- commands from phone remotes (any transport). The PIN gates control; watching needs none. --- */
+const MESSAGE_COLORS = ['white', 'green', 'red'];
+function applyCommand(msg) {
+  if (!msg || msg.type !== 'command') return { ok: false, reason: 'Not a command' };
+  if (String(msg.pin) !== String(state.pin)) return { ok: false, reason: 'Wrong PIN' };
+  const v = msg.value;
+  switch (msg.action) {
+    case 'play': play(); break;
+    case 'reset': reset(); break;
+    case 'next': step(1); break;
+    case 'prev': step(-1); break;
+    case 'nudge': { const n = Math.max(-3600, Math.min(3600, parseInt(v, 10) || 0)); if (n) nudge(n); break; }
+    case 'blackout': state.blackout = !state.blackout; commit(); break;
+    case 'flash': state.flashNonce++; commit(); break;
+    case 'load': if (state.timers.some(t => t.id === v)) selectTimer(v); break;
+    case 'message': {
+      const m = v && typeof v === 'object' ? v : {};
+      const text = String(m.text || '').slice(0, 200); if (!text) return { ok: false, reason: 'Empty message' };
+      state.message = { text, color: MESSAGE_COLORS.includes(m.color) ? m.color : state.message.color, bold: !!m.bold, upper: !!m.upper, flash: !!m.flash, on: true };
+      $('#msgText').value = text; $('#msgBold').checked = state.message.bold; $('#msgUpper').checked = state.message.upper; $('#msgFlash').checked = state.message.flash;
+      commit(); break;
+    }
+    case 'hideMessage': state.message.on = false; commit(); break;
+    case 'hello': break;
+    default: return { ok: false, reason: 'Unknown action' };
+  }
+  return { ok: true };
+}
+function ackFor(msg) { return { type: 'ack', id: msg && msg.id, ...applyCommand(msg) }; }
 
 /* --- engine: auto-stop at zero, linked timers, scheduled starts ---
    Runs from a Web Worker clock. Browsers throttle timers and pause animation frames in background
@@ -1074,6 +1225,15 @@ document.addEventListener('keydown', ev => {
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && overlay.classList.contains('on')) overlay.classList.remove('on'); });
 
 /* --- remote displays over the venue Wi-Fi (desktop app only) --- */
+const linkKind = { lan: 'output', room: 'output', relay: 'output', onChange: {} };
+$$('.seg').forEach(seg => seg.addEventListener('click', ev => {
+  const b = ev.target.closest('button'); if (!b) return;
+  const which = seg.dataset.seg; linkKind[which] = b.dataset.kind;
+  $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  if (linkKind.onChange[which]) linkKind.onChange[which]();
+}));
+$('#pinValue').textContent = state.pin;
+$('#pinNew').addEventListener('click', () => { state.pin = newPin(); $('#pinValue').textContent = state.pin; commit(); });
 function setupLanRemote() {
   const bridge = window.stageClock; if (!bridge || !bridge.lanInfo) return;
   remote.sinks.push(msg => bridge.publish(msg));
@@ -1084,13 +1244,14 @@ function setupLanRemote() {
     info.urls.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); });
     sel.hidden = info.urls.length < 2;
     const show = () => {
-      const url = sel.value + '/?view=output&lan=1'; $('#lanUrl').value = url;
+      const url = sel.value + '/?view=' + linkKind.lan + '&lan=1'; $('#lanUrl').value = url;
       const box = $('#lanQr'); box.innerHTML = '';
       if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
     };
-    sel.addEventListener('change', show); show();
+    sel.addEventListener('change', show); show(); linkKind.onChange.lan = show;
     pushRemote();
   }).catch(() => {});
+  if (bridge.onCommand) bridge.onCommand(({ clientId, msg }) => { const ack = ackFor(msg); if (bridge.reply) bridge.reply(clientId, ack); });
   if (bridge.onClients) bridge.onClients(n => { $('#lanClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; });
   $('#lanCopy').addEventListener('click', () => {
     const v = $('#lanUrl').value;
@@ -1104,7 +1265,7 @@ const room = { code: '', peer: null, conns: new Set(), sink: null };
 function roomUpdateClients() { const n = room.conns.size; $('#roomClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; }
 function roomShow() {
   $('#roomOff').hidden = true; $('#roomOn').hidden = false; $('#roomCode').textContent = room.code;
-  const url = displayLink('room=' + room.code); $('#roomUrl').value = url;
+  const url = viewLink(linkKind.room, 'room=' + room.code); $('#roomUrl').value = url;
   const box = $('#roomQr'); box.innerHTML = '';
   if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
   roomUpdateClients();
@@ -1123,6 +1284,7 @@ function roomStart(code) {
     });
     room.peer.on('connection', c => {
       c.on('open', () => { room.conns.add(c); roomUpdateClients(); try { c.send(remoteMessage()); } catch (e) {} });
+      c.on('data', msg => { if (msg && msg.type === 'command') { try { c.send(ackFor(msg)); } catch (e) {} } });
       c.on('close', () => { room.conns.delete(c); roomUpdateClients(); });
       c.on('error', () => { room.conns.delete(c); roomUpdateClients(); });
     });
@@ -1153,7 +1315,7 @@ $('#relayUrl').value = state.settings.relayUrl || '';
 $('#relayUrl').addEventListener('change', () => { state.settings.relayUrl = $('#relayUrl').value.trim(); commit(); });
 function relayShow() {
   $('#relayOn').hidden = false; $('#relayCode').textContent = relay.code;
-  const url = displayLink('relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url;
+  const url = viewLink(linkKind.relay, 'relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url;
   const box = $('#relayQr'); box.innerHTML = '';
   if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
 }
@@ -1172,7 +1334,13 @@ function relayStart(code) {
       if (!relay.sink) { relay.sink = msg => { if (relay.sock && relay.sock.readyState === 1) relay.sock.send(JSON.stringify(msg)); }; remote.sinks.push(relay.sink); }
       relayShow(); pushRemote();
     };
-    relay.sock.onmessage = ev => { try { const m = JSON.parse(ev.data); if (m.type === 'clients') $('#relayClients').textContent = m.n === 0 ? 'No displays connected' : m.n === 1 ? '1 display connected' : `${m.n} displays connected`; } catch (e) {} };
+    relay.sock.onmessage = ev => {
+      try {
+        const m = JSON.parse(ev.data);
+        if (m.type === 'clients') $('#relayClients').textContent = m.n === 0 ? 'No displays connected' : m.n === 1 ? '1 display connected' : `${m.n} displays connected`;
+        else if (m.type === 'command' && m.from) relay.sock.send(JSON.stringify({ type: 'reply', to: m.from, msg: ackFor(m) }));
+      } catch (e) {}
+    };
     relay.sock.onclose = () => { if (relay.stopped) return; $('#relayError').textContent = 'Relay connection lost. Reconnecting…'; setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
     relay.sock.onerror = () => { try { relay.sock.close(); } catch (e) {} };
   };
@@ -1193,7 +1361,9 @@ $('#relayCopy').addEventListener('click', () => {
   navigator.clipboard?.writeText(v).then(() => { $('#relayCopy').textContent = 'Copied'; setTimeout(() => $('#relayCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#relayLink').select(); });
 });
 try { const saved = sessionStorage.getItem('stage-clock-relay-room'); if (saved && saved.length === 6 && state.settings.relayUrl) relayStart(saved); } catch (e) {}
-window.__stageClock = { room, relay, remote };
+linkKind.onChange.room = () => { if (room.code) roomShow(); };
+linkKind.onChange.relay = () => { if (relay.code) relayShow(); };
+window.__stageClock = { room, relay, remote, applyCommand };
 
 /* --- keep the screen awake while the controller is open --- */
 let wakeLock = null;

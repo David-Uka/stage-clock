@@ -44,6 +44,10 @@ In **Remote displays**, click **Start a room**. The display device opens the lin
 
 If you would rather not depend on the public PeerJS service, deploy the relay in [`relay/`](relay/README.md) to Cloudflare Workers (free plan, about five minutes), paste its address into **Remote displays → Your own relay**, and click **Start relay room**. Displays open the link or scan the code, exactly like a room code.
 
+## Remote control from a phone
+
+Every remote link above can open as a **remote control** instead of a display: switch the QR code to "Remote control" in the panel, or change `view=output` to `view=remote` in the link. The phone page shows the current timer and has Start/Pause, Next, Prev, ±1 min, ±10 s, Reset, Blackout, Flash and a message box. Controlling needs the four-digit **Control PIN** shown in the panel; watching never does. Click **New PIN** to change it.
+
 ## Shortcuts
 
 | Key | Action |

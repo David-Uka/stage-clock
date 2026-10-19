@@ -11,7 +11,7 @@ const APP_DIR = path.join(__dirname, 'app');
 const PORT = 4455;
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png', '.css': 'text/css' };
 
-let mainWin = null, lastMessage = null, port = null;
+let mainWin = null, lastMessage = null, port = null, nextClientId = 1;
 const clients = new Set();
 
 /* ---- local display server ---- */
@@ -29,8 +29,15 @@ function startServer(tryPort) {
     const server = http.createServer(serveStatic);
     const wss = new WebSocketServer({ server, path: '/ws' });
     wss.on('connection', ws => {
+      ws.id = nextClientId++;
       clients.add(ws); broadcastClients();
       if (lastMessage) ws.send(lastMessage);
+      // Phone remotes send commands; the controller page decides (PIN) and replies to that one client.
+      ws.on('message', data => {
+        if (data.length > 16 * 1024 || !mainWin || mainWin.isDestroyed()) return;
+        let msg; try { msg = JSON.parse(String(data)); } catch (e) { return; }
+        if (msg && msg.type === 'command') mainWin.webContents.send('stage-clock:command', { clientId: ws.id, msg });
+      });
       ws.on('close', () => { clients.delete(ws); broadcastClients(); });
       ws.on('error', () => {});
     });
@@ -55,6 +62,9 @@ ipcMain.on('stage-clock:state', (_e, msg) => {
   for (const ws of clients) { if (ws.readyState === ws.OPEN) ws.send(lastMessage); }
 });
 ipcMain.handle('stage-clock:lan-info', () => ({ port, urls: lanUrls() }));
+ipcMain.on('stage-clock:reply', (_e, { clientId, msg }) => {
+  for (const ws of clients) { if (ws.id === clientId && ws.readyState === ws.OPEN) { ws.send(JSON.stringify(msg)); break; } }
+});
 
 /* ---- windows ---- */
 function createWindow() {

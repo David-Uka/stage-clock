@@ -42,7 +42,18 @@ async function main() {
   check('display cannot push state', (await d1.expect(m => m.type === 'state' && m.state.activeId === 'evil', 800)) === null);
   ctrl.send('not json'); ctrl.send(JSON.stringify({ type: 'other' }));
   check('junk from controller is ignored', (await d1.expect(m => m.type !== 'state', 800)) === null);
-  d1.close(); d2.close();
+  const rm = await open(`ws://127.0.0.1:${PORT}/room/${code}?role=remote`);
+  check('remote got last state on join', !!(await rm.expect(m => m.type === 'state' && m.state.activeId === 'x')));
+  check('controller told 3 clients', !!(await ctrl.expect(m => m.type === 'clients' && m.n === 3)));
+  rm.send(JSON.stringify({ type: 'command', id: 'k1', action: 'play', pin: '1234' }));
+  const cmd = await ctrl.expect(m => m.type === 'command' && m.id === 'k1');
+  check('controller received the command with a sender id', !!cmd && typeof cmd.from === 'string');
+  ctrl.send(JSON.stringify({ type: 'reply', to: cmd.from, msg: { type: 'ack', id: 'k1', ok: true } }));
+  check('remote received the ack', !!(await rm.expect(m => m.type === 'ack' && m.id === 'k1' && m.ok === true)));
+  check('display did not see the ack', (await d1.expect(m => m.type === 'ack', 500)) === null);
+  rm.send(JSON.stringify({ type: 'state', state: { v: 1, activeId: 'evil' } }));
+  check('remote cannot push state', (await d1.expect(m => m.type === 'state' && m.state.activeId === 'evil', 600)) === null);
+  d1.close(); d2.close(); rm.close();
   check('controller told 0 displays after close', !!(await ctrl.expect(m => m.type === 'clients' && m.n === 0)));
   ctrl.close();
 }

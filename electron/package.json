@@ -24,7 +24,10 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": [
       "main.js",
-      "app/**/*"
+      "preload.js",
+      "afterSign.js",
+      "app/**/*",
+      "node_modules/**/*"
     ],
     "win": {
       "icon": "app/icon-512.png",
@@ -52,5 +55,8 @@
       "category": "Utility"
     },
     "afterSign": "afterSign.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
   }
 }

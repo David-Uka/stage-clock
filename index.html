@@ -219,6 +219,10 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output .o-conn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 5cqh; color: var(--o-dim); display: none; text-align: center; padding: 2cqh 4cqw; }
 .output.no-source .o-conn { display: block; }
 .output.no-source .o-mid, .output.no-source .o-top, .output.no-source .o-bottom, .output.no-source .o-progress { visibility: hidden; }
+.roomcode { font-family: var(--font-mono); font-size: 28px; letter-spacing: .18em; font-weight: 700; color: var(--accent); }
+.output .o-conn form { display: flex; gap: 8px; justify-content: center; margin-top: 2cqh; font-family: var(--font-ui); }
+.output .o-conn input { font-size: 3.5cqh; width: 9em; text-align: center; letter-spacing: .2em; text-transform: uppercase; background: #000; color: #fff; border: 1px solid #555; border-radius: 6px; padding: .3em .5em; }
+.output .o-conn button { font-size: 3.5cqh; background: #fff; color: #000; border: 0; border-radius: 6px; padding: .3em .8em; }
 .qr { width: 148px; height: 148px; flex: none; background: #fff; padding: 8px; border-radius: 6px; }
 .qr svg { width: 100%; height: 100%; display: block; }
 .output.blackout .o-blackout { display: block; }
@@ -345,6 +349,7 @@ body.output-mode #overlay { display: block; }
 
       <div class="panel" id="remotePanel">
         <h3>Remote displays</h3>
+        <div class="eyebrow" style="margin-bottom:6px">On the venue Wi-Fi · desktop app</div>
         <div id="lanRemote" hidden>
           <p class="hint" style="margin:0 0 10px">Any phone, tablet or laptop on this Wi-Fi can show the speaker display. Scan the code or open the link. No internet needed.</p>
           <div class="row" style="align-items:flex-start">
@@ -358,6 +363,22 @@ body.output-mode #overlay { display: block; }
           </div>
         </div>
         <p class="hint" id="lanUnavailable" style="margin:0">Remote displays over the venue Wi-Fi need the desktop app (Windows, macOS or Linux download). In the browser, use "Open display window" on this computer.</p>
+
+        <div class="eyebrow" style="margin:16px 0 6px">Anywhere · room code</div>
+        <p class="hint" style="margin:0 0 8px">Needs internet on both ends. The display opens the link or enters the code at the Stage Clock website. Devices connect to each other directly; the public PeerJS service only introduces them.</p>
+        <div class="row" id="roomOff"><button class="btn" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
+        <div id="roomOn" hidden>
+          <div class="row" style="align-items:flex-start">
+            <div class="qr" id="roomQr" aria-label="QR code for the room link"></div>
+            <div class="field" style="flex:1 1 220px">
+              <label>Room code</label>
+              <div class="roomcode" id="roomCode"></div>
+              <label for="roomUrl">Display link</label>
+              <input type="text" id="roomUrl" readonly>
+              <div class="row"><button class="btn small" id="roomCopy">Copy link</button><span class="hint" id="roomClients">No displays connected</span><button class="btn small danger" id="roomStop">Stop room</button></div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -624,6 +645,22 @@ function applyRemote(msg) {
   return true;
 }
 const PARAMS = new URLSearchParams(location.search);
+const PEERJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
+const PUBLIC_URL = 'https://david-uka.github.io/stage-clock/';
+const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const normalizeCode = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+const peerId = code => 'stageclock-' + code;
+function loadPeerJs() {
+  return new Promise((resolve, reject) => {
+    if (window.Peer) return resolve();
+    const el = document.createElement('script'); el.src = PEERJS_URL; el.onload = resolve; el.onerror = () => reject(new Error('Could not load PeerJS. Check the internet connection.'));
+    document.head.appendChild(el);
+  });
+}
+function displayLink(params) {
+  const base = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : PUBLIC_URL;
+  return base + '?view=output&' + params;
+}
 
 /* ============ OUTPUT-ONLY WINDOW (?view=output) ============ */
 if (IS_OUTPUT) {
@@ -634,8 +671,38 @@ if (IS_OUTPUT) {
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
   document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
-  const isRemote = PARAMS.has('lan');
-  if (!isRemote) {
+  const isRemote = PARAMS.has('lan') || PARAMS.has('room');
+  if (PARAMS.has('room')) {
+    // Anywhere: connect to the controller's room through PeerJS (WebRTC data channel).
+    let code = normalizeCode(PARAMS.get('room'));
+    const askForCode = () => {
+      remote.label = '';
+      root._els.conn.innerHTML = '<div>Enter the room code shown on the controller</div><form><input id="roomInput" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false"><button type="submit">Join</button></form>';
+      $('form', root._els.conn).addEventListener('submit', ev => { ev.preventDefault(); const c = normalizeCode($('#roomInput').value); if (c.length === 6) { const u = new URL(location.href); u.searchParams.set('room', c); location.href = u.toString(); } });
+      $('#roomInput').focus();
+    };
+    if (code.length !== 6) askForCode();
+    else {
+      remote.label = `Connecting to room ${code}…`;
+      let peer = null, conn = null, retry = 2000;
+      const connect = () => {
+        try { conn = peer.connect(peerId(code), { reliable: true, serialization: 'json' }); } catch (e) { setTimeout(connect, retry); return; }
+        conn.on('open', () => { retry = 2000; remote.label = `Connected to room ${code}. Waiting for the controller…`; });
+        conn.on('data', msg => applyRemote(msg));
+        conn.on('close', () => { remote.connected = false; remote.label = `Room ${code}: connection lost. Reconnecting…`; setTimeout(connect, retry); retry = Math.min(retry * 2, 15000); });
+        conn.on('error', () => {});
+      };
+      loadPeerJs().then(() => {
+        peer = new Peer();
+        peer.on('open', connect);
+        peer.on('error', err => {
+          if (err && err.type === 'peer-unavailable') { remote.connected = false; remote.label = `Room ${code} is not open. Start it on the controller, then this screen will connect.`; setTimeout(connect, 5000); }
+          else { remote.label = `Connection problem (${err && err.type || 'unknown'}). Retrying…`; }
+        });
+        peer.on('disconnected', () => { try { peer.reconnect(); } catch (e) {} });
+      }).catch(e => { remote.label = e.message; });
+    }
+  } else if (!isRemote) {
     // Same computer: follow the controller through the browser's own channels.
     if (bc) bc.onmessage = ev => { if (ev.data && ev.data.v === 1) state = ev.data; };
     window.addEventListener('storage', ev => { if (ev.key === STORE_KEY && ev.newValue) { try { state = JSON.parse(ev.newValue); } catch (e) {} } });
@@ -656,7 +723,7 @@ if (IS_OUTPUT) {
   const tick = () => {
     renderOutput(root, state, nowMs());
     root.classList.toggle('no-source', isRemote && !remote.connected);
-    root._els.conn.textContent = remote.label;
+    if (remote.label) root._els.conn.textContent = remote.label;
     requestAnimationFrame(tick);
   };
   tick();
@@ -987,6 +1054,56 @@ function setupLanRemote() {
   });
 }
 setupLanRemote();
+
+/* --- remote displays anywhere: host a room over PeerJS --- */
+const room = { code: '', peer: null, conns: new Set(), sink: null };
+function roomUpdateClients() { const n = room.conns.size; $('#roomClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; }
+function roomShow() {
+  $('#roomOff').hidden = true; $('#roomOn').hidden = false; $('#roomCode').textContent = room.code;
+  const url = displayLink('room=' + room.code); $('#roomUrl').value = url;
+  const box = $('#roomQr'); box.innerHTML = '';
+  if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
+  roomUpdateClients();
+}
+function roomStart(code) {
+  room.code = code || Array.from({ length: 6 }, () => ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)]).join('');
+  $('#roomError').textContent = 'Starting…';
+  loadPeerJs().then(() => {
+    room.peer = new Peer(peerId(room.code));
+    room.peer.on('open', () => {
+      $('#roomError').textContent = '';
+      try { sessionStorage.setItem('stage-clock-room', room.code); } catch (e) {}
+      room.sink = msg => { for (const c of room.conns) { if (c.open) { try { c.send(msg); } catch (e) {} } } };
+      remote.sinks.push(room.sink);
+      roomShow(); pushRemote();
+    });
+    room.peer.on('connection', c => {
+      c.on('open', () => { room.conns.add(c); roomUpdateClients(); try { c.send(remoteMessage()); } catch (e) {} });
+      c.on('close', () => { room.conns.delete(c); roomUpdateClients(); });
+      c.on('error', () => { room.conns.delete(c); roomUpdateClients(); });
+    });
+    room.peer.on('error', err => {
+      if (err && err.type === 'unavailable-id') { roomStop(); roomStart(); return; }   // code taken: try another
+      $('#roomError').textContent = 'Room problem: ' + (err && err.type || 'unknown') + '. Check the internet connection.';
+    });
+    room.peer.on('disconnected', () => { try { room.peer.reconnect(); } catch (e) {} });
+  }).catch(e => { $('#roomError').textContent = e.message; });
+}
+function roomStop() {
+  if (room.peer) { try { room.peer.destroy(); } catch (e) {} }
+  remote.sinks = remote.sinks.filter(fn => fn !== room.sink);
+  room.peer = null; room.sink = null; room.conns.clear(); room.code = '';
+  try { sessionStorage.removeItem('stage-clock-room'); } catch (e) {}
+  $('#roomOff').hidden = false; $('#roomOn').hidden = true; $('#roomError').textContent = '';
+}
+$('#roomStart').addEventListener('click', () => roomStart());
+$('#roomStop').addEventListener('click', roomStop);
+$('#roomCopy').addEventListener('click', () => {
+  const v = $('#roomUrl').value;
+  navigator.clipboard?.writeText(v).then(() => { $('#roomCopy').textContent = 'Copied'; setTimeout(() => $('#roomCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#roomUrl').select(); });
+});
+try { const saved = sessionStorage.getItem('stage-clock-room'); if (saved && saved.length === 6) roomStart(saved); } catch (e) {}
+window.__stageClock = { room, remote };
 
 /* --- keep the screen awake while the controller is open --- */
 let wakeLock = null;

@@ -1,83 +1,58 @@
 # Stage Clock
 
-A free, open-source countdown timer for live events: conferences, church services, pitch nights, school debates, anything with a speaker and a clock.
+Free, open-source countdown timer for live events. Runs in the browser, installs as a Windows, macOS or Linux app, works offline. No account, no server, nothing leaves your machine.
 
-Runs in any browser, installs as a Windows / macOS / Linux app, works offline, and needs no account or server. Nothing leaves your machine.
-
-**Silent by design.** Every alert is visual: the digits turn yellow, then red, then the whole screen flashes red with "TIME'S UP". No sound, ever.
+All alerts are visual. The digits turn yellow, then red, then the screen flashes red with "TIME'S UP". No sound.
 
 ![Controller](docs/screenshot-controller.png)
 ![Speaker display](docs/screenshot-display.png)
 
 ## Get it
 
-| | |
-| --- | --- |
-| **Use it in the browser** | <https://david-uka.github.io/stage-clock/> |
-| **Install on Windows** (no download) | Open the link above in Edge or Chrome and click the **Install app** icon in the address bar. |
-| **Download the Windows installer / portable .exe** | [Latest release](https://github.com/David-Uka/stage-clock/releases/latest) |
-| **macOS / Linux** | Same release page: `.dmg` and `.AppImage` |
+- **Browser:** <https://david-uka.github.io/stage-clock/>
+- **Windows, no download:** open the link above in Edge or Chrome and click the install icon in the address bar.
+- **Installer / portable .exe, macOS, Linux:** [latest release](https://github.com/David-Uka/stage-clock/releases/latest)
 
-> The Windows installer is not code-signed yet, so SmartScreen may show "Windows protected your PC". Click **More info → Run anyway**. The in-browser install has no such warning.
+The .exe is not code-signed yet. If SmartScreen appears, click **More info → Run anyway**.
 
-## What it does
+## Features
 
-- **Rundown**: one timer per speaker or segment, each with a title, speaker line, duration, count down or count up, what happens at zero (keep counting overtime as `+0:12`, or stop), and optional auto-start of the next timer. Drag to reorder, duplicate, edit, delete.
-- **Wrap-up colors**: per timer, choose when the digits turn yellow and when they turn red.
-- **Time's up alert**: flash the whole screen red, solid red screen, blinking red digits, or plain red digits. The "TIME'S UP" text is editable.
-- **Speaker display**: huge digits, title at the top, speaker at the bottom, time of day, "next up", progress bar. Open it in its own window and drag it to the projector or confidence monitor, or go fullscreen in the same tab.
-- **Live control**: start/pause, reset, next/previous, nudge ±10 s / ±1 min / +5 min while running, blackout, flash to get attention, and text messages to the speaker (white/green/red, bold, uppercase, flashing).
-- **Appearance**: all colors, three digit fonts, toggles for every element, 12/24-hour clock.
-- **Import/export** the rundown and appearance as JSON. Everything is saved in the browser automatically.
+- One timer per speaker or segment, with title, speaker line, duration, count down or count up, overtime or stop at zero, auto-start next. Drag to reorder.
+- Per-timer yellow and red warning times.
+- Time's up: flash the screen red, solid red, blinking digits, or plain red digits. The text is editable.
+- Speaker display in its own window for the projector, or fullscreen in the same tab.
+- Start/pause, reset, next/previous, ±10 s and ±1 min while running, blackout, flash, messages to the speaker.
+- All colors and fonts adjustable. JSON import/export. Saves automatically.
 
-## Keyboard shortcuts
+## Shortcuts
 
 | Key | Action |
 | --- | --- |
 | Space | Start / pause |
-| R | Reset current timer |
-| N / → | Next timer |
-| P / ← | Previous timer |
-| ↑ / ↓ | Add / remove 1 minute |
-| Shift + ↑ / ↓ | Add / remove 10 seconds |
-| F | Fullscreen display in this tab (Esc to leave) |
+| R | Reset |
+| N / P | Next / previous timer |
+| ↑ / ↓ | ±1 minute (Shift: ±10 s) |
+| F | Fullscreen display (Esc to leave) |
 | B | Blackout |
-| X | Flash the display |
-| M | Jump to the message box |
+| X | Flash |
+| M | Message box |
 
 ## Run from source
 
-The whole app is `index.html`. No build step.
+The app is a single `index.html`, no build step.
 
 ```sh
 git clone https://github.com/David-Uka/stage-clock
 cd stage-clock
-python3 -m http.server 8080        # or: npx serve .
+python3 -m http.server 8080
 ```
 
-Open <http://localhost:8080>. Open `/?view=output` in another window for the display.
-
-### Desktop builds
-
-```sh
-cd electron
-npm install
-npm start              # run it
-npm run build:win      # electron/dist/Stage Clock-1.0.0-win-setup.exe + win-portable.exe
-npm run build:mac      # .dmg
-npm run build:linux    # .AppImage
-```
-
-Tagging a release (`git tag v1.0.1 && git push --tags`) makes GitHub Actions build all three and attach them to the release.
+Desktop builds: `cd electron && npm install && npm run build:win` (or `build:mac`, `build:linux`). Pushing a `v*` tag builds all three on GitHub Actions and attaches them to a release.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Bug reports and feature requests are welcome as issues.
-
-## Credits
-
-Feature ideas borrowed from the tools event crews already use: [Stagetimer](https://stagetimer.io) (rundown, wrap-up colors, messages, output screen), [Big Timer](https://www.bigtimer.net) (one-click fullscreen, red flash), [CueTimer](https://presentationtools.com) (whole-screen flash, overtime counter), and [Ontime](https://github.com/cpvalente/ontime) (operator vs stage views).
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE). Use it, change it, ship it.
+[MIT](LICENSE)

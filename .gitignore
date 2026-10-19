@@ -4,3 +4,5 @@ electron/app/
 .DS_Store
 test-results/
 playwright-report/
+relay/node_modules/
+relay/.wrangler/

@@ -40,6 +40,10 @@ The desktop app runs a small local server. Open **Remote displays** in the contr
 
 In **Remote displays**, click **Start a room**. The display device opens the link, scans the QR code, or opens <https://david-uka.github.io/stage-clock/?view=output&room=> and types the six-character code. Both ends need internet. The devices connect to each other directly over WebRTC; the public PeerJS service only introduces them and never sees the timer data.
 
+## Remote displays through your own relay
+
+If you would rather not depend on the public PeerJS service, deploy the relay in [`relay/`](relay/README.md) to Cloudflare Workers (free plan, about five minutes), paste its address into **Remote displays → Your own relay**, and click **Start relay room**. Displays open the link or scan the code, exactly like a room code.
+
 ## Shortcuts
 
 | Key | Action |

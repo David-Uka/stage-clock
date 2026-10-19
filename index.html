@@ -1,0 +1,872 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stage Clock</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Event countdown timer with a rundown, wrap-up colors, silent visual alerts and a fullscreen speaker display.">
+<meta name="theme-color" content="#0b0d10">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&family=Roboto+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a dark control room. Left: the rundown. Right: the live preview and transport. The output is the same renderer, blown up to the whole screen. */
+:root {
+  --bg: #0b0d10;
+  --panel: #14181d;
+  --panel-2: #1b2128;
+  --line: #2a323b;
+  --fg: #e8ecf0;
+  --muted: #8b96a3;
+  --accent: #3fb6ff;
+  --accent-ink: #061018;
+  --ok: #37d67a;
+  --warn: #f5c518;
+  --crit: #ff3b3b;
+  --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --font-cond: "Barlow Semi Condensed", "Barlow", "Arial Narrow", sans-serif;
+  --font-mono: "Roboto Mono", "Consolas", "Menlo", monospace;
+  --radius: 8px;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.4;
+  overflow: hidden;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+.eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+
+/* ---------- controller frame ---------- */
+#controller {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+}
+.topbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-block: 10px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand h1 { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+.brand .clock { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.topbar .spacer { flex: 1; }
+.main {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.2fr);
+  gap: 0;
+  min-height: 0;
+}
+.col {
+  min-width: 0; min-height: 0; overflow: auto;
+  padding-block: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.col.left { border-right: 1px solid var(--line); }
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  #controller { height: auto; min-height: 100%; }
+  .main { grid-template-columns: 1fr; }
+  .col { overflow: visible; }
+  .col.left { border-right: 0; border-bottom: 1px solid var(--line); }
+}
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 7px 12px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel-2);
+  font-weight: 600; white-space: nowrap;
+  transition: background .12s, border-color .12s, transform .05s;
+}
+.btn:hover { background: #222a33; border-color: #3a4552; }
+.btn:active { transform: translateY(1px); }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { background: #63c4ff; }
+.btn.danger { color: #ffb3b3; }
+.btn.danger:hover { border-color: var(--crit); }
+.btn.small { padding: 4px 8px; font-size: 12px; }
+.btn.big { padding: 14px 18px; font-size: 18px; font-family: var(--font-cond); letter-spacing: .04em; text-transform: uppercase; }
+.btn.toggle[aria-pressed="true"] { background: var(--warn); color: #231a00; border-color: var(--warn); }
+.btn kbd { font-family: var(--font-mono); font-size: 10px; opacity: .6; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
+
+/* ---------- rundown ---------- */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.section-head h2 { font-family: var(--font-cond); font-size: 18px; font-weight: 700; }
+#rundown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.timer-card {
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+  padding: 10px 12px; border-radius: var(--radius);
+  border: 1px solid var(--line); background: var(--panel);
+  cursor: grab;
+}
+.timer-card.dragging { opacity: .4; }
+.timer-card.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
+.timer-card.active { border-color: var(--accent); background: #12222e; }
+.timer-card.done { opacity: .55; }
+.timer-card .idx { font-family: var(--font-mono); color: var(--muted); font-size: 12px; width: 22px; text-align: right; }
+.timer-card .title { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timer-card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
+.timer-card .meta .dur { font-family: var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+.timer-card .meta .w { color: var(--warn); } .timer-card .meta .c { color: var(--crit); }
+.timer-card .actions { display: flex; gap: 4px; }
+.timer-card .actions .btn { padding: 4px 7px; }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
+.total { color: var(--muted); font-size: 12px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+
+/* ---------- now playing ---------- */
+.preview-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; position: relative; }
+.preview-wrap .output { position: absolute; inset: 0; }
+.transport { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+.transport .wide { grid-column: span 3; }
+.nudge { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.panel { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.panel h3 { font-family: var(--font-cond); font-size: 16px; margin-bottom: 8px; }
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.field label { font-size: 12px; color: var(--muted); font-weight: 600; }
+input[type="text"], input[type="number"], select, textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; width: 100%;
+}
+input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+input[type="color"] { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.hms { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+.hms input { text-align: center; }
+.hms span { display: block; text-align: center; font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+@media (max-width: 480px) { .grid3 { grid-template-columns: 1fr; } .grid2 { grid-template-columns: 1fr; } }
+.check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.msg-colors { display: flex; gap: 6px; }
+.msg-colors .btn { width: 36px; height: 32px; padding: 0; }
+.msg-colors .btn[data-c="white"] { background: #fff; } .msg-colors .btn[data-c="green"] { background: var(--ok); } .msg-colors .btn[data-c="red"] { background: var(--crit); }
+.msg-colors .btn[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hint { color: var(--muted); font-size: 12px; }
+.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px; color: var(--muted); }
+.shortcuts kbd { font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--fg); }
+
+/* ---------- dialogs ---------- */
+dialog {
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px;
+  padding: 18px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
+}
+dialog::backdrop { background: rgba(0,0,0,.6); }
+dialog h2 { font-family: var(--font-cond); font-size: 20px; margin-bottom: 12px; }
+dialog .form { display: flex; flex-direction: column; gap: 12px; }
+dialog .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180px; white-space: pre; }
+
+/* ---------- OUTPUT (speaker display) ---------- */
+.output {
+  --o-bg: #000; --o-fg: #fff; --o-warn: #f5c518; --o-crit: #ff2d2d; --o-dim: #8a8a8a;
+  background: var(--o-bg); color: var(--o-fg);
+  position: relative; width: 100%; height: 100%; overflow: hidden;
+  display: grid; grid-template-rows: auto 1fr auto; align-items: center;
+  font-family: var(--font-cond);
+  text-align: center; user-select: none;
+  container-type: size;
+}
+.output[data-font="mono"] { font-family: var(--font-mono); }
+.output[data-font="system"] { font-family: "Segoe UI", system-ui, sans-serif; }
+.output .o-top, .output .o-bottom { display: flex; justify-content: space-between; align-items: center; gap: 2cqw; padding: 2.5cqh 3cqw; min-width: 0; }
+.output .o-title { font-size: 6cqh; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.output .o-clock { font-size: 4.5cqh; color: var(--o-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.output .o-speaker { font-size: 5cqh; color: var(--o-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.output .o-next { font-size: 3.6cqh; color: var(--o-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.output .o-next b { color: var(--o-fg); font-weight: 600; }
+.output .o-mid { position: relative; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.output .o-time {
+  font-weight: 700; line-height: .9; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  font-size: 36cqh;
+}
+.output .o-time.len5 { font-size: min(36cqh, 26cqw); }
+.output .o-time.len6 { font-size: min(36cqh, 22cqw); }
+.output .o-time.len7 { font-size: min(36cqh, 19cqw); }
+.output .o-time.len8 { font-size: min(36cqh, 16.5cqw); }
+.output .o-time.len9 { font-size: min(36cqh, 14.5cqw); }
+.output .o-endtext { font-size: 9cqh; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-top: 1cqh; min-height: 9cqh; }
+.output .o-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 1.6cqh; background: rgba(255,255,255,.12); }
+.output .o-progress i { display: block; height: 100%; width: 100%; background: var(--o-fg); transition: width .25s linear; }
+.output .o-message {
+  position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+  padding: 6cqh 6cqw; background: var(--o-bg);
+  font-size: 12cqh; font-weight: 600; line-height: 1.15; overflow-wrap: anywhere;
+}
+.output .o-message.on { display: flex; }
+.output .o-message.bold { font-weight: 700; }
+.output .o-message.upper { text-transform: uppercase; }
+.output .o-message.green { color: #37d67a; } .output .o-message.red { color: #ff3b3b; }
+.output .o-message.flash { animation: msgflash 1s steps(2, start) infinite; }
+.output .o-blackout { position: absolute; inset: 0; background: #000; display: none; }
+.output.blackout .o-blackout { display: block; }
+.output.blackout .o-message { display: none; }
+
+/* phases */
+.output.warn .o-time { color: var(--o-warn); } .output.warn .o-progress i { background: var(--o-warn); }
+.output.crit .o-time { color: var(--o-crit); } .output.crit .o-progress i { background: var(--o-crit); }
+.output.over .o-progress i { background: var(--o-crit); }
+.output.over .o-time { color: var(--o-crit); }
+.output.over[data-end="solid"] { background: var(--o-crit); }
+.output.over[data-end="solid"] .o-time, .output.over[data-end="solid"] .o-endtext, .output.over[data-end="solid"] .o-title, .output.over[data-end="solid"] .o-speaker, .output.over[data-end="solid"] .o-clock, .output.over[data-end="solid"] .o-next { color: #fff; }
+.output.over[data-end="flash"] { animation: bgflash 1s steps(2, start) infinite; }
+.output.over[data-end="flash"] .o-time, .output.over[data-end="flash"] .o-endtext { color: #fff; }
+.output.over[data-end="text"] .o-time { animation: textflash 1s steps(2, start) infinite; }
+.output.flashing { animation: identify .25s steps(2, start) 6; }
+@keyframes bgflash { 0% { background: var(--o-crit); } 100% { background: var(--o-bg); } }
+@keyframes textflash { 0% { opacity: 1; } 100% { opacity: .15; } }
+@keyframes msgflash { 0% { opacity: 1; } 100% { opacity: .2; } }
+@keyframes identify { 0% { background: #fff; } 100% { background: var(--o-bg); } }
+@media (prefers-reduced-motion: reduce) {
+  .output.over[data-end="flash"] { animation: none; background: var(--o-crit); }
+  .output.over[data-end="text"] .o-time { animation: none; }
+}
+.output.hide-title .o-title, .output.hide-speaker .o-speaker, .output.hide-clock .o-clock, .output.hide-next .o-next, .output.hide-progress .o-progress { visibility: hidden; }
+
+/* full-screen output overlay inside the controller tab */
+#overlay { position: fixed; inset: 0; z-index: 50; display: none; }
+#overlay.on { display: block; }
+#overlay .exit { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2; opacity: .35; transition: opacity .2s; }
+#overlay:hover .exit, #overlay .exit:focus-visible { opacity: 1; }
+body.output-mode #controller { display: none; }
+body.output-mode #overlay { display: block; }
+</style>
+</head>
+<body>
+
+<div id="controller">
+  <header class="topbar">
+    <div class="brand">
+      <h1>STAGE CLOCK</h1>
+      <span class="clock" id="topClock">00:00:00</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn" id="btnPopout" title="Open the speaker display in its own window (drag it to the projector or second screen)">Open display window</button>
+    <button class="btn" id="btnOverlay" title="Show the speaker display full-screen in this tab">Full-screen here <kbd>F</kbd></button>
+    <button class="btn" id="btnSettings">Appearance</button>
+    <button class="btn" id="btnExport">Export</button>
+    <button class="btn" id="btnImport">Import</button>
+  </header>
+
+  <div class="main">
+    <section class="col left" aria-label="Rundown">
+      <div class="section-head">
+        <h2>Rundown</h2>
+        <div class="row">
+          <button class="btn small" id="btnResetAll" title="Mark every timer as not done">Reset all</button>
+          <button class="btn primary" id="btnAdd">+ Add timer</button>
+        </div>
+      </div>
+      <ul id="rundown"></ul>
+      <div class="total" id="total"></div>
+      <div class="panel">
+        <h3>Keyboard shortcuts</h3>
+        <div class="shortcuts">
+          <kbd>Space</kbd><span>Start / pause</span>
+          <kbd>R</kbd><span>Reset current timer</span>
+          <kbd>N</kbd> <span>Next timer</span>
+          <kbd>P</kbd> <span>Previous timer</span>
+          <kbd>↑ / ↓</kbd><span>Add / remove 1 minute</span>
+          <kbd>Shift ↑ / ↓</kbd><span>Add / remove 10 seconds</span>
+          <kbd>F</kbd><span>Full-screen display in this tab (Esc to leave)</span>
+          <kbd>B</kbd><span>Blackout</span>
+          <kbd>X</kbd><span>Flash the display</span>
+          <kbd>M</kbd><span>Jump to the message box</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="col right" aria-label="Now playing">
+      <div class="section-head">
+        <h2>Now playing</h2>
+        <span class="hint" id="statusLine"></span>
+      </div>
+      <div class="preview-wrap"><div class="output" id="preview"></div></div>
+
+      <div class="transport">
+        <button class="btn big primary" id="btnPlay">Start</button>
+        <button class="btn big" id="btnReset">Reset</button>
+        <button class="btn big" id="btnNext">Next ▸</button>
+      </div>
+      <div class="nudge">
+        <button class="btn" data-nudge="-60">−1 min</button>
+        <button class="btn" data-nudge="-10">−10 s</button>
+        <button class="btn" data-nudge="10">+10 s</button>
+        <button class="btn" data-nudge="60">+1 min</button>
+        <button class="btn" data-nudge="300">+5 min</button>
+        <span class="spacer" style="flex:1"></span>
+        <button class="btn" id="btnPrev">◂ Prev</button>
+        <button class="btn toggle" id="btnBlackout" aria-pressed="false">Blackout <kbd>B</kbd></button>
+        <button class="btn" id="btnFlash">Flash <kbd>X</kbd></button>
+      </div>
+
+      <div class="panel">
+        <h3>Message to speaker</h3>
+        <div class="row">
+          <input type="text" id="msgText" placeholder="e.g. Please wrap up, Q&amp;A starts next" style="flex:1 1 200px">
+          <div class="msg-colors" role="group" aria-label="Message color">
+            <button class="btn" data-c="white" aria-pressed="true" title="White"></button>
+            <button class="btn" data-c="green" aria-pressed="false" title="Green"></button>
+            <button class="btn" data-c="red" aria-pressed="false" title="Red"></button>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px">
+          <label class="check"><input type="checkbox" id="msgBold"> Bold</label>
+          <label class="check"><input type="checkbox" id="msgUpper"> Uppercase</label>
+          <label class="check"><input type="checkbox" id="msgFlash"> Flashing</label>
+          <span class="spacer" style="flex:1"></span>
+          <button class="btn primary" id="btnMsgShow">Show</button>
+          <button class="btn" id="btnMsgHide">Hide</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="overlay"><div class="output" id="bigOutput"></div><button class="btn exit" id="btnExitOverlay">Exit (Esc)</button></div>
+
+<dialog id="timerDialog">
+  <h2 id="timerDialogTitle">Add timer</h2>
+  <form class="form" id="timerForm" method="dialog">
+    <div class="field"><label for="tTitle">Title (shown at the top of the display)</label><input type="text" id="tTitle" placeholder="Opening keynote" required></div>
+    <div class="field"><label for="tSpeaker">Speaker / subtitle (shown at the bottom)</label><input type="text" id="tSpeaker" placeholder="Dr. Amara Okafor"></div>
+    <div class="grid2">
+      <div class="field"><label>Duration</label>
+        <div class="hms">
+          <div><input type="number" id="tH" min="0" max="99" value="0" inputmode="numeric"><span>hours</span></div>
+          <div><input type="number" id="tM" min="0" max="59" value="20" inputmode="numeric"><span>min</span></div>
+          <div><input type="number" id="tS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div>
+        </div>
+      </div>
+      <div class="field"><label for="tMode">Display</label>
+        <select id="tMode"><option value="down">Count down to zero</option><option value="up">Count up from zero</option></select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label>Turn yellow with this much left</label>
+        <div class="hms" style="grid-template-columns:1fr 1fr"><div><input type="number" id="tWarnM" min="0" value="5" inputmode="numeric"><span>min</span></div><div><input type="number" id="tWarnS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div>
+      </div>
+      <div class="field"><label>Turn red with this much left</label>
+        <div class="hms" style="grid-template-columns:1fr 1fr"><div><input type="number" id="tCritM" min="0" value="1" inputmode="numeric"><span>min</span></div><div><input type="number" id="tCritS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="tZero">When time runs out</label>
+        <select id="tZero"><option value="continue">Keep counting overtime (+0:12)</option><option value="stop">Stop at zero</option></select>
+      </div>
+      <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" id="tAuto"> Start the next timer automatically</label></div>
+    </div>
+    <div class="foot">
+      <button type="button" class="btn" id="tCancel">Cancel</button>
+      <button type="submit" class="btn primary" id="tSave">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="settingsDialog">
+  <h2>Appearance</h2>
+  <p class="hint" style="margin:0 0 12px">Changes apply to the display immediately. Alerts are silent: there is no sound at any point.</p>
+  <div class="form">
+    <div class="grid3">
+      <div class="field"><label for="sBg">Background</label><input type="color" id="sBg"></div>
+      <div class="field"><label for="sFg">Digits</label><input type="color" id="sFg"></div>
+      <div class="field"><label for="sDim">Secondary text</label><input type="color" id="sDim"></div>
+      <div class="field"><label for="sWarn">Wrap-up (yellow)</label><input type="color" id="sWarn"></div>
+      <div class="field"><label for="sCrit">Final / time over (red)</label><input type="color" id="sCrit"></div>
+      <div class="field"><label for="sFont">Digit font</label>
+        <select id="sFont"><option value="condensed">Condensed</option><option value="mono">Monospace</option><option value="system">System</option></select>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="field"><label for="sEnd">Alert when time is over</label>
+        <select id="sEnd">
+          <option value="flash">Flash whole screen red</option>
+          <option value="solid">Solid red screen</option>
+          <option value="text">Blink the digits red</option>
+          <option value="none">Just turn the digits red</option>
+        </select>
+      </div>
+      <div class="field"><label for="sEndText">Text shown when time is over</label><input type="text" id="sEndText" placeholder="TIME'S UP"></div>
+    </div>
+    <div class="grid3">
+      <label class="check"><input type="checkbox" id="sShowTitle"> Show title</label>
+      <label class="check"><input type="checkbox" id="sShowSpeaker"> Show speaker</label>
+      <label class="check"><input type="checkbox" id="sShowClock"> Show time of day</label>
+      <label class="check"><input type="checkbox" id="sShowNext"> Show "next up"</label>
+      <label class="check"><input type="checkbox" id="sShowProgress"> Show progress bar</label>
+      <label class="check"><input type="checkbox" id="sClock24"> 24-hour clock</label>
+      <label class="check"><input type="checkbox" id="sHideHours"> Hide hours when zero</label>
+    </div>
+    <div class="foot">
+      <button type="button" class="btn" id="sDefaults">Restore defaults</button>
+      <button type="button" class="btn primary" id="sClose">Done</button>
+    </div>
+  </div>
+</dialog>
+
+<dialog id="ioDialog">
+  <h2 id="ioTitle">Export rundown</h2>
+  <div class="form">
+    <p class="hint" id="ioHint" style="margin:0"></p>
+    <textarea class="json" id="ioText" spellcheck="false"></textarea>
+    <div class="row" id="ioImportRow" hidden>
+      <input type="file" id="ioFile" accept="application/json,.json">
+    </div>
+  </div>
+  <div class="foot">
+    <button type="button" class="btn" id="ioClose">Close</button>
+    <button type="button" class="btn" id="ioCopy">Copy</button>
+    <a class="btn" id="ioDownload" download="stage-clock-rundown.json" href="#">Download</a>
+    <button type="button" class="btn primary" id="ioLoad" hidden>Load into rundown</button>
+  </div>
+</dialog>
+
+<script>
+(() => {
+'use strict';
+const STORE_KEY = 'stage-clock-state-v1';
+const CHANNEL = 'stage-clock';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const uid = () => Math.random().toString(36).slice(2, 10);
+const pad = n => String(n).padStart(2, '0');
+
+const DEFAULT_SETTINGS = {
+  bg: '#000000', fg: '#ffffff', dim: '#8a8a8a', warn: '#f5c518', crit: '#ff2d2d',
+  font: 'condensed', endStyle: 'flash', endText: "TIME'S UP",
+  showTitle: true, showSpeaker: true, showClock: true, showNext: true, showProgress: true,
+  clock24: true, hideHours: true,
+};
+const SAMPLE_TIMERS = [
+  { id: uid(), title: 'Welcome & housekeeping', speaker: 'Host', duration: 5 * 60, warnAt: 60, critAt: 30, mode: 'down', atZero: 'continue', autoNext: false, done: false },
+  { id: uid(), title: 'Opening keynote', speaker: 'Dr. Amara Okafor', duration: 20 * 60, warnAt: 5 * 60, critAt: 60, mode: 'down', atZero: 'continue', autoNext: false, done: false },
+  { id: uid(), title: 'Panel: Shipping on time', speaker: 'Moderated by Lena Park', duration: 30 * 60, warnAt: 5 * 60, critAt: 2 * 60, mode: 'down', atZero: 'continue', autoNext: false, done: false },
+  { id: uid(), title: 'Coffee break', speaker: 'Back at the top of the hour', duration: 15 * 60, warnAt: 3 * 60, critAt: 60, mode: 'down', atZero: 'stop', autoNext: true, done: false },
+];
+
+function freshState() {
+  return {
+    v: 1, timers: SAMPLE_TIMERS.map(t => ({ ...t })), activeId: SAMPLE_TIMERS[0].id,
+    running: false, endAt: 0, remainingMs: SAMPLE_TIMERS[0].duration * 1000,
+    message: { text: '', color: 'white', bold: false, upper: false, flash: false, on: false },
+    blackout: false, flashNonce: 0, settings: { ...DEFAULT_SETTINGS },
+  };
+}
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) { const s = JSON.parse(raw); s.settings = { ...DEFAULT_SETTINGS, ...(s.settings || {}) }; return s; }
+  } catch (e) { /* storage unavailable: run from memory */ }
+  return freshState();
+}
+let state = loadState();
+let bc = null;
+try { bc = new BroadcastChannel(CHANNEL); } catch (e) { bc = null; }
+
+const IS_OUTPUT = new URLSearchParams(location.search).get('view') === 'output';
+
+/* ---------- time helpers ---------- */
+function activeTimer(s = state) { return s.timers.find(t => t.id === s.activeId) || null; }
+function remainingMs(s = state, now = Date.now()) {
+  if (!activeTimer(s)) return 0;
+  return s.running ? s.endAt - now : s.remainingMs;
+}
+function fmtClock(ms, hideHours, round = Math.ceil) {
+  const total = Math.max(0, round(ms / 1000));
+  const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+  if (h === 0 && hideHours) return `${pad(m)}:${pad(sec)}`;
+  return `${h}:${pad(m)}:${pad(sec)}`;
+}
+function fmtDur(sec) { return fmtClock(sec * 1000, false).replace(/^0:/, ''); }
+function fmtTod(d, h24) {
+  let h = d.getHours(); const m = pad(d.getMinutes()), s = pad(d.getSeconds());
+  if (h24) return `${pad(h)}:${m}:${s}`;
+  const ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return `${h}:${m}:${s} ${ap}`;
+}
+
+/* ---------- OUTPUT RENDERER (shared by preview, overlay and the pop-out window) ---------- */
+const OUTPUT_HTML = `
+  <div class="o-top"><div class="o-title"></div><div class="o-clock"></div></div>
+  <div class="o-mid"><div class="o-time">00:00</div><div class="o-endtext"></div></div>
+  <div class="o-bottom"><div class="o-speaker"></div><div class="o-next"></div></div>
+  <div class="o-progress"><i></i></div>
+  <div class="o-message"></div>
+  <div class="o-blackout"></div>`;
+function mountOutput(root) {
+  root.innerHTML = OUTPUT_HTML;
+  root._els = {
+    title: $('.o-title', root), clock: $('.o-clock', root), time: $('.o-time', root), end: $('.o-endtext', root),
+    speaker: $('.o-speaker', root), next: $('.o-next', root), bar: $('.o-progress i', root), msg: $('.o-message', root),
+  };
+  root._lastFlash = state.flashNonce;
+  return root;
+}
+function renderOutput(root, s, now) {
+  const e = root._els; if (!e) return;
+  const st = s.settings, t = activeTimer(s);
+  root.style.setProperty('--o-bg', st.bg); root.style.setProperty('--o-fg', st.fg); root.style.setProperty('--o-dim', st.dim);
+  root.style.setProperty('--o-warn', st.warn); root.style.setProperty('--o-crit', st.crit);
+  root.dataset.font = st.font; root.dataset.end = st.endStyle;
+  root.classList.toggle('hide-title', !st.showTitle); root.classList.toggle('hide-speaker', !st.showSpeaker);
+  root.classList.toggle('hide-clock', !st.showClock); root.classList.toggle('hide-next', !st.showNext);
+  root.classList.toggle('hide-progress', !st.showProgress);
+  root.classList.toggle('blackout', !!s.blackout);
+  e.clock.textContent = fmtTod(new Date(now), st.clock24);
+
+  let phase = 'normal', text = '--:--', endText = '', frac = 0;
+  if (t) {
+    const rem = remainingMs(s, now), durMs = t.duration * 1000;
+    if (rem <= 0) phase = 'over';
+    else if (rem <= t.critAt * 1000) phase = 'crit';
+    else if (rem <= t.warnAt * 1000) phase = 'warn';
+    if (t.mode === 'up') {
+      text = fmtClock(durMs - rem, st.hideHours, Math.floor);
+    } else if (rem <= 0 && t.atZero === 'continue') {
+      text = '+' + fmtClock(-rem, st.hideHours);
+    } else {
+      text = fmtClock(Math.max(0, rem), st.hideHours);
+    }
+    if (phase === 'over') endText = st.endText || '';
+    frac = durMs > 0 ? Math.min(1, Math.max(0, rem / durMs)) : 0;
+    e.title.textContent = t.title; e.speaker.textContent = t.speaker || '';
+    const idx = s.timers.findIndex(x => x.id === t.id); const nx = s.timers[idx + 1];
+    e.next.innerHTML = nx ? `Next: <b></b> · ${fmtDur(nx.duration)}` : '';
+    if (nx) $('b', e.next).textContent = nx.title;
+  } else {
+    e.title.textContent = 'No timer selected'; e.speaker.textContent = ''; e.next.textContent = '';
+  }
+  e.time.textContent = text; e.time.className = 'o-time len' + Math.min(9, Math.max(5, text.length));
+  e.end.textContent = endText;
+  e.bar.style.width = (frac * 100) + '%';
+  root.classList.toggle('normal', phase === 'normal'); root.classList.toggle('warn', phase === 'warn');
+  root.classList.toggle('crit', phase === 'crit'); root.classList.toggle('over', phase === 'over');
+
+  const m = s.message;
+  e.msg.textContent = m.text; e.msg.className = 'o-message' + (m.on && m.text ? ' on' : '') + ' ' + m.color + (m.bold ? ' bold' : '') + (m.upper ? ' upper' : '') + (m.flash ? ' flash' : '');
+  if (s.flashNonce !== root._lastFlash) {
+    root._lastFlash = s.flashNonce;
+    root.classList.remove('flashing'); void root.offsetWidth; root.classList.add('flashing');
+    setTimeout(() => root.classList.remove('flashing'), 1600);
+  }
+}
+
+/* ============ OUTPUT-ONLY WINDOW (?view=output) ============ */
+if (IS_OUTPUT) {
+  document.body.classList.add('output-mode');
+  document.title = 'Stage Clock · Display';
+  const root = mountOutput($('#bigOutput'));
+  $('#btnExitOverlay').textContent = 'Full screen (F)';
+  $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
+  if (bc) bc.onmessage = ev => { if (ev.data && ev.data.v === 1) state = ev.data; };
+  window.addEventListener('storage', ev => { if (ev.key === STORE_KEY && ev.newValue) { try { state = JSON.parse(ev.newValue); } catch (e) {} } });
+  document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
+  document.addEventListener('dblclick', toggleFullscreen);
+  const tick = () => { renderOutput(root, state, Date.now()); requestAnimationFrame(tick); };
+  tick();
+  return;
+}
+
+/* ============ CONTROLLER ============ */
+const preview = mountOutput($('#preview'));
+const bigOutput = mountOutput($('#bigOutput'));
+const overlay = $('#overlay');
+let popout = null;
+
+function commit() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
+  if (bc) bc.postMessage(state);
+  renderRundown(); renderControls();
+}
+
+/* --- transport --- */
+function selectTimer(id, { keepRunning = false } = {}) {
+  const t = state.timers.find(x => x.id === id); if (!t) return;
+  state.activeId = id; state.remainingMs = t.duration * 1000; state.endAt = Date.now() + state.remainingMs;
+  state.running = keepRunning;
+  commit();
+}
+function play() {
+  const t = activeTimer(); if (!t) return;
+  if (state.running) { state.remainingMs = state.endAt - Date.now(); state.running = false; }
+  else { state.endAt = Date.now() + state.remainingMs; state.running = true; }
+  commit();
+}
+function reset() { const t = activeTimer(); if (!t) return; state.running = false; state.remainingMs = t.duration * 1000; commit(); }
+function nudge(sec) {
+  const t = activeTimer(); if (!t) return;
+  if (state.running) state.endAt += sec * 1000; else state.remainingMs += sec * 1000;
+  commit();
+}
+function step(dir) {
+  const i = state.timers.findIndex(x => x.id === state.activeId);
+  const n = state.timers[i + dir]; if (!n) return;
+  const wasRunning = state.running;
+  if (dir > 0 && state.timers[i]) state.timers[i].done = true;
+  selectTimer(n.id, { keepRunning: wasRunning });
+}
+function toggleFullscreen() {
+  const el = document.documentElement;
+  try {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+  } catch (e) {}
+}
+function showOverlay(on) {
+  overlay.classList.toggle('on', on);
+  if (on) { try { document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(() => {}); } catch (e) {} }
+  else if (document.fullscreenElement) { try { document.exitFullscreen().catch(() => {}); } catch (e) {} }
+}
+
+/* --- engine tick: auto-stop at zero, auto-advance, clocks --- */
+function tick() {
+  const now = Date.now(), t = activeTimer();
+  if (t && state.running) {
+    const rem = state.endAt - now;
+    if (rem <= 0) {
+      if (t.atZero === 'stop') { state.running = false; state.remainingMs = 0; commit(); }
+      if (t.autoNext) {
+        const i = state.timers.findIndex(x => x.id === t.id); const n = state.timers[i + 1];
+        if (n) { t.done = true; selectTimer(n.id, { keepRunning: true }); }
+        else if (t.atZero !== 'stop') { state.running = false; state.remainingMs = 0; commit(); }
+      }
+    }
+  }
+  renderOutput(preview, state, now);
+  if (overlay.classList.contains('on')) renderOutput(bigOutput, state, now);
+  $('#topClock').textContent = fmtTod(new Date(now), state.settings.clock24);
+  if (t) {
+    const rem = remainingMs(state, now);
+    $('#statusLine').textContent = state.running ? (rem <= 0 ? 'Over time' : 'Running') : (rem <= 0 ? 'Finished' : 'Paused');
+  } else $('#statusLine').textContent = '';
+  requestAnimationFrame(tick);
+}
+
+/* --- rundown list --- */
+function renderRundown() {
+  const ul = $('#rundown'); ul.innerHTML = '';
+  if (!state.timers.length) {
+    ul.innerHTML = '<li class="empty">No timers yet. Add one for each speaker or segment.</li>';
+    $('#total').textContent = ''; return;
+  }
+  state.timers.forEach((t, i) => {
+    const li = document.createElement('li');
+    li.className = 'timer-card' + (t.id === state.activeId ? ' active' : '') + (t.done ? ' done' : '');
+    li.draggable = true; li.dataset.id = t.id;
+    li.innerHTML = `
+      <div class="idx">${i + 1}</div>
+      <div style="min-width:0">
+        <div class="title"></div>
+        <div class="meta"><span class="dur">${fmtDur(t.duration)}</span><span>${t.mode === 'up' ? 'count up' : 'countdown'}</span>
+          <span class="w">▲ ${fmtDur(t.warnAt)}</span><span class="c">▲ ${fmtDur(t.critAt)}</span>
+          ${t.atZero === 'stop' ? '<span>stops at 0</span>' : '<span>overtime</span>'}${t.autoNext ? '<span>auto-next</span>' : ''}
+          <span class="speaker"></span></div>
+      </div>
+      <div class="actions">
+        <button class="btn small" data-act="load" title="Load this timer">Load</button>
+        <button class="btn small" data-act="edit" title="Edit">✎</button>
+        <button class="btn small" data-act="dup" title="Duplicate">⧉</button>
+        <button class="btn small danger" data-act="del" title="Delete">✕</button>
+      </div>`;
+    $('.title', li).textContent = t.title; $('.speaker', li).textContent = t.speaker || '';
+    li.addEventListener('dblclick', () => selectTimer(t.id));
+    li.addEventListener('click', ev => {
+      const act = ev.target.closest('[data-act]')?.dataset.act; if (!act) return;
+      if (act === 'load') selectTimer(t.id);
+      if (act === 'edit') openTimerDialog(t);
+      if (act === 'dup') { const c = { ...t, id: uid(), done: false }; state.timers.splice(i + 1, 0, c); commit(); }
+      if (act === 'del') { state.timers.splice(i, 1); if (state.activeId === t.id) { state.activeId = state.timers[0]?.id || null; state.running = false; state.remainingMs = (state.timers[0]?.duration || 0) * 1000; } commit(); }
+    });
+    li.addEventListener('dragstart', ev => { dragId = t.id; li.classList.add('dragging'); ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', t.id); } catch (e) {} });
+    li.addEventListener('dragend', () => { dragId = null; $$('.timer-card').forEach(x => x.classList.remove('dragging', 'drop-before')); });
+    li.addEventListener('dragover', ev => { ev.preventDefault(); $$('.timer-card').forEach(x => x.classList.remove('drop-before')); li.classList.add('drop-before'); });
+    li.addEventListener('drop', ev => {
+      ev.preventDefault(); if (!dragId || dragId === t.id) return;
+      const from = state.timers.findIndex(x => x.id === dragId); const [moved] = state.timers.splice(from, 1);
+      const to = state.timers.findIndex(x => x.id === t.id); state.timers.splice(to, 0, moved); commit();
+    });
+    ul.appendChild(li);
+  });
+  const total = state.timers.reduce((a, t) => a + t.duration, 0);
+  $('#total').textContent = `${state.timers.length} timers · total ${fmtDur(total)} · drag cards to reorder, double-click to load`;
+}
+let dragId = null;
+
+function renderControls() {
+  $('#btnPlay').textContent = state.running ? 'Pause' : 'Start';
+  $('#btnBlackout').setAttribute('aria-pressed', String(!!state.blackout));
+  const m = state.message;
+  $$('.msg-colors .btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === m.color)));
+}
+
+/* --- timer dialog --- */
+const timerDialog = $('#timerDialog');
+let editingId = null;
+function openTimerDialog(t) {
+  editingId = t ? t.id : null;
+  $('#timerDialogTitle').textContent = t ? 'Edit timer' : 'Add timer';
+  const d = t ? t.duration : 20 * 60, w = t ? t.warnAt : 5 * 60, c = t ? t.critAt : 60;
+  $('#tTitle').value = t ? t.title : ''; $('#tSpeaker').value = t ? (t.speaker || '') : '';
+  $('#tH').value = Math.floor(d / 3600); $('#tM').value = Math.floor((d % 3600) / 60); $('#tS').value = d % 60;
+  $('#tWarnM').value = Math.floor(w / 60); $('#tWarnS').value = w % 60;
+  $('#tCritM').value = Math.floor(c / 60); $('#tCritS').value = c % 60;
+  $('#tMode').value = t ? t.mode : 'down'; $('#tZero').value = t ? t.atZero : 'continue'; $('#tAuto').checked = t ? !!t.autoNext : false;
+  timerDialog.showModal(); $('#tTitle').focus();
+}
+const num = id => Math.max(0, parseInt($(id).value, 10) || 0);
+$('#timerForm').addEventListener('submit', ev => {
+  ev.preventDefault();
+  const duration = num('#tH') * 3600 + num('#tM') * 60 + num('#tS');
+  if (duration <= 0) { $('#tM').focus(); return; }
+  const data = {
+    title: $('#tTitle').value.trim() || 'Untitled', speaker: $('#tSpeaker').value.trim(), duration,
+    warnAt: num('#tWarnM') * 60 + num('#tWarnS'), critAt: num('#tCritM') * 60 + num('#tCritS'),
+    mode: $('#tMode').value, atZero: $('#tZero').value, autoNext: $('#tAuto').checked,
+  };
+  if (editingId) {
+    const t = state.timers.find(x => x.id === editingId); Object.assign(t, data);
+    if (state.activeId === t.id && !state.running) state.remainingMs = Math.min(state.remainingMs, duration * 1000);
+  } else {
+    const t = { id: uid(), done: false, ...data }; state.timers.push(t);
+    if (!state.activeId) { state.activeId = t.id; state.remainingMs = duration * 1000; }
+  }
+  timerDialog.close(); commit();
+});
+$('#tCancel').addEventListener('click', () => timerDialog.close());
+$('#btnAdd').addEventListener('click', () => openTimerDialog(null));
+$('#btnResetAll').addEventListener('click', () => { state.timers.forEach(t => t.done = false); if (state.timers[0]) selectTimer(state.timers[0].id); else commit(); });
+
+/* --- transport wiring --- */
+$('#btnPlay').addEventListener('click', play);
+$('#btnReset').addEventListener('click', reset);
+$('#btnNext').addEventListener('click', () => step(1));
+$('#btnPrev').addEventListener('click', () => step(-1));
+$$('[data-nudge]').forEach(b => b.addEventListener('click', () => nudge(parseInt(b.dataset.nudge, 10))));
+$('#btnBlackout').addEventListener('click', () => { state.blackout = !state.blackout; commit(); });
+$('#btnFlash').addEventListener('click', () => { state.flashNonce++; commit(); });
+$('#btnOverlay').addEventListener('click', () => showOverlay(true));
+$('#btnExitOverlay').addEventListener('click', () => showOverlay(false));
+$('#btnPopout').addEventListener('click', () => {
+  const url = location.pathname + '?view=output';
+  try { popout = window.open(url, 'stage-clock-output', 'width=1280,height=720'); } catch (e) { popout = null; }
+  if (!popout) { showOverlay(true); }
+});
+
+/* --- messages --- */
+function syncMessageForm() {
+  const m = state.message;
+  m.text = $('#msgText').value; m.bold = $('#msgBold').checked; m.upper = $('#msgUpper').checked; m.flash = $('#msgFlash').checked;
+}
+$('#btnMsgShow').addEventListener('click', () => { syncMessageForm(); state.message.on = true; commit(); });
+$('#btnMsgHide').addEventListener('click', () => { state.message.on = false; commit(); });
+$('#msgText').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#btnMsgShow').click(); } });
+$$('#msgBold, #msgUpper, #msgFlash').forEach(el => el.addEventListener('change', () => { syncMessageForm(); commit(); }));
+$$('.msg-colors .btn').forEach(b => b.addEventListener('click', () => { state.message.color = b.dataset.c; commit(); }));
+$('#msgText').value = state.message.text; $('#msgBold').checked = state.message.bold; $('#msgUpper').checked = state.message.upper; $('#msgFlash').checked = state.message.flash;
+
+/* --- settings --- */
+const settingsDialog = $('#settingsDialog');
+const SETTING_FIELDS = { bg: 'sBg', fg: 'sFg', dim: 'sDim', warn: 'sWarn', crit: 'sCrit', font: 'sFont', endStyle: 'sEnd', endText: 'sEndText',
+  showTitle: 'sShowTitle', showSpeaker: 'sShowSpeaker', showClock: 'sShowClock', showNext: 'sShowNext', showProgress: 'sShowProgress', clock24: 'sClock24', hideHours: 'sHideHours' };
+function fillSettings() {
+  for (const [k, id] of Object.entries(SETTING_FIELDS)) {
+    const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!state.settings[k]; else el.value = state.settings[k];
+  }
+}
+for (const [k, id] of Object.entries(SETTING_FIELDS)) {
+  $('#' + id).addEventListener('input', ev => { const el = ev.target; state.settings[k] = el.type === 'checkbox' ? el.checked : el.value; commit(); });
+}
+$('#btnSettings').addEventListener('click', () => { fillSettings(); settingsDialog.showModal(); });
+$('#sClose').addEventListener('click', () => settingsDialog.close());
+$('#sDefaults').addEventListener('click', () => { state.settings = { ...DEFAULT_SETTINGS }; fillSettings(); commit(); });
+
+/* --- import / export --- */
+const ioDialog = $('#ioDialog');
+function exportJson() { return JSON.stringify({ app: 'stage-clock', v: 1, timers: state.timers.map(({ done, ...t }) => t), settings: state.settings }, null, 2); }
+$('#btnExport').addEventListener('click', () => {
+  $('#ioTitle').textContent = 'Export rundown'; $('#ioHint').textContent = 'Copy this JSON or download it. Import it on another machine to restore the rundown and appearance.';
+  const json = exportJson(); $('#ioText').value = json; $('#ioText').readOnly = true;
+  $('#ioImportRow').hidden = true; $('#ioLoad').hidden = true; $('#ioDownload').hidden = false; $('#ioCopy').hidden = false;
+  $('#ioDownload').href = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+  ioDialog.showModal();
+});
+$('#btnImport').addEventListener('click', () => {
+  $('#ioTitle').textContent = 'Import rundown'; $('#ioHint').textContent = 'Paste the JSON from an export, or choose the file. This replaces the current rundown.';
+  $('#ioText').value = ''; $('#ioText').readOnly = false;
+  $('#ioImportRow').hidden = false; $('#ioLoad').hidden = false; $('#ioDownload').hidden = true; $('#ioCopy').hidden = true;
+  ioDialog.showModal();
+});
+$('#ioFile').addEventListener('change', ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader(); r.onload = () => { $('#ioText').value = String(r.result); }; r.readAsText(f);
+});
+$('#ioLoad').addEventListener('click', () => {
+  try {
+    const d = JSON.parse($('#ioText').value);
+    if (!Array.isArray(d.timers)) throw new Error('no timers array');
+    state.timers = d.timers.map(t => ({ id: uid(), title: String(t.title || 'Untitled'), speaker: String(t.speaker || ''), duration: Math.max(1, +t.duration || 60),
+      warnAt: Math.max(0, +t.warnAt || 0), critAt: Math.max(0, +t.critAt || 0), mode: t.mode === 'up' ? 'up' : 'down', atZero: t.atZero === 'stop' ? 'stop' : 'continue', autoNext: !!t.autoNext, done: false }));
+    if (d.settings) state.settings = { ...DEFAULT_SETTINGS, ...d.settings };
+    state.running = false; state.activeId = state.timers[0]?.id || null; state.remainingMs = (state.timers[0]?.duration || 0) * 1000;
+    ioDialog.close(); commit();
+  } catch (e) { $('#ioHint').textContent = 'That is not a valid Stage Clock export. Check the JSON and try again.'; }
+});
+$('#ioCopy').addEventListener('click', () => {
+  const ta = $('#ioText');
+  navigator.clipboard?.writeText(ta.value).then(() => { $('#ioCopy').textContent = 'Copied'; setTimeout(() => $('#ioCopy').textContent = 'Copy', 1500); })
+    .catch(() => { ta.focus(); ta.select(); });
+});
+$('#ioClose').addEventListener('click', () => ioDialog.close());
+
+/* --- keyboard --- */
+document.addEventListener('keydown', ev => {
+  const tag = (ev.target.tagName || '').toLowerCase();
+  const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || ev.target.isContentEditable || document.querySelector('dialog[open]');
+  if (ev.key === 'Escape' && overlay.classList.contains('on')) { showOverlay(false); return; }
+  if (typing) return;
+  switch (ev.key) {
+    case ' ': ev.preventDefault(); play(); break;
+    case 'r': case 'R': reset(); break;
+    case 'n': case 'N': case 'ArrowRight': step(1); break;
+    case 'p': case 'P': case 'ArrowLeft': step(-1); break;
+    case 'ArrowUp': ev.preventDefault(); nudge(ev.shiftKey ? 10 : 60); break;
+    case 'ArrowDown': ev.preventDefault(); nudge(ev.shiftKey ? -10 : -60); break;
+    case 'f': case 'F': showOverlay(!overlay.classList.contains('on')); break;
+    case 'b': case 'B': state.blackout = !state.blackout; commit(); break;
+    case 'x': case 'X': state.flashNonce++; commit(); break;
+    case 'm': case 'M': ev.preventDefault(); $('#msgText').focus(); break;
+  }
+});
+document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && overlay.classList.contains('on')) overlay.classList.remove('on'); });
+
+/* --- keep the screen awake while the controller is open --- */
+let wakeLock = null;
+async function requestWake() { try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') requestWake(); });
+requestWake();
+
+/* --- offline install (PWA); silently skipped where service workers are not allowed --- */
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  try { navigator.serviceWorker.register('sw.js').catch(() => {}); } catch (e) {}
+}
+
+commit();
+tick();
+})();
+</script>
+</body>
+</html>

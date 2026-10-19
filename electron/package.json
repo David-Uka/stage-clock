@@ -24,7 +24,8 @@
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "files": ["main.js", "app/**/*"],
     "win": { "icon": "app/icon-512.png", "target": ["nsis", "portable"] },
-    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true },
+    "nsis": { "oneClick": true, "perMachine": false, "createDesktopShortcut": true, "artifactName": "${productName}-${version}-win-setup.${ext}" },
+    "portable": { "artifactName": "${productName}-${version}-win-portable.${ext}" },
     "mac": { "icon": "app/icon-512.png", "category": "public.app-category.productivity" },
     "linux": { "icon": "app/icon-512.png", "category": "Utility" }
   }

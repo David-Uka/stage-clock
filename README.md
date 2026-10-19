@@ -63,7 +63,7 @@ Open <http://localhost:8080>. Open `/?view=output` in another window for the dis
 cd electron
 npm install
 npm start              # run it
-npm run build:win      # electron/dist/Stage Clock-1.0.0-win-x64.exe (+ portable)
+npm run build:win      # electron/dist/Stage Clock-1.0.0-win-setup.exe + win-portable.exe
 npm run build:mac      # .dmg
 npm run build:linux    # .AppImage
 ```

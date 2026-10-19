@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.1 (2026-10-19)
+
+- macOS build is ad-hoc signed so it no longer reports "damaged and can't be opened". It still needs right-click → Open the first time.
+- README explains the macOS and Windows first-run prompts.
+
 ## 1.1.0 (2026-10-19)
 
 - Scheduled starts: a timer can start at a set time of day.

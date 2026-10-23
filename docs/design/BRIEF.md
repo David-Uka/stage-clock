@@ -155,7 +155,7 @@ Keyboard: Space start/pause, R reset, N next, P previous, ↑/↓ ±1 min, Shift
 
 These are the UX issues the redesign should fix, roughly in priority order.
 
-1. **Keyboard shortcuts are hidden.** They live in a panel at the bottom of the rundown column. With eight timers in the list it scrolls off-screen, and a new operator never finds out that Space starts the clock. Only three buttons carry a key chip (Full-screen here, Blackout, Flash). Requirement: shortcuts are visible on the main page without looking for them. Put the key on every control that has one (Start = Space, Reset = R, Next = N, Prev = P, ±1 min = ↑ ↓, ±10 s = Shift ↑ ↓, Full-screen = F, Blackout = B, Flash = X, Message = M), and keep a compact always-visible strip or legend near the transport, never only inside a dialog or a panel you must scroll to. On touch devices the chips can hide, because there is no keyboard.
+1. **Keyboard shortcuts take up main-page space.** A full "Keyboard shortcuts" panel sits on the main page under the rundown, and three buttons carry key chips (Full-screen here, Blackout, Flash). Requirement: the shortcut list is not on the main page. Someone who wants it should have to look for it: a small "?" or keyboard icon in the top bar, or pressing ? on the keyboard, opens a shortcut sheet; it is never shown by default. The key chips on buttons go too, so the controls read clean. The shortcuts themselves (Space, R, N, P, ↑ ↓, Shift ↑ ↓, F, B, X, M) keep working exactly as they do now.
 2. **The mobile controller buries the controls.** See section 2.1. On a phone the Now playing block (status, preview, transport, nudges) must come first or the transport must be a sticky bar, the top bar must collapse to the one primary action plus a menu, timers need touch reordering (move up / move down, or a drag handle with pointer events), card actions need 44 px targets, delete needs a confirm or undo, and the full-screen exit must be a solid visible button.
 3. **The running state is not loud enough on the controller.** "Running" is a 12 px muted status line. The active card gets a thin blue border. An operator glancing from across the room cannot tell if the clock is running or paused. Make running, paused and over time unmistakable in both columns.
 4. **The remote-displays panel is a wall of text.** Three transports, each with a paragraph, a toggle, a QR, a link and buttons, all stacked under the message panel. Most users will use exactly one. Needs progressive disclosure: pick one, see one. Explanations should move into help, not sit above every control.
@@ -179,7 +179,7 @@ These are the UX issues the redesign should fix, roughly in priority order.
 - The display renderer must keep scaling with container-query units (`cqh`, `cqw`) because the same markup runs at preview size and at 4K.
 - Keep the semantic colours and their meanings.
 - Silent. No sound, no haptics, no suggestion of them.
-- Keyboard shortcuts stay and stay visible somewhere.
+- Keyboard shortcuts keep working but are not shown on the main page; they live behind a "?" entry point.
 - Must still work at 1024 px wide (old venue laptops). The controller and the remote are both first-class at 390 px (phone) and 768 px (tablet); the controller is not allowed to be a squashed desktop.
 - On touch (`pointer: coarse`) every control is at least 44 px tall, nothing depends on hover, double-click or a tooltip, and nothing depends on the Escape key.
 - Respect `prefers-reduced-motion`.
@@ -189,7 +189,7 @@ These are the UX issues the redesign should fix, roughly in priority order.
 ## 9. What to deliver
 
 1. Controller at 1440, 1024, 768 and 390 px wide, in the running, paused and over-time states. The 390 and 768 px versions must show how the transport reaches the top, how timers are reordered by touch, and how the top bar collapses.
-2. The keyboard shortcut treatment: key chips on the controls and the always-visible strip or legend, plus how it hides on touch.
+2. The shortcut sheet and its entry point (the "?" control in the top bar), and the controls without key chips.
 3. The speaker display in every state in the table in section 2.2, as a 16:9 frame.
 4. The phone remote at 390 px, connected with and without a valid PIN, and in the wrong-PIN state.
 5. Add timer dialog and Appearance dialog.

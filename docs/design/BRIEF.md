@@ -34,7 +34,7 @@ Dark "control room" layout. One top bar, then two columns.
 - **Right column, "Now playing":** a status line (Running / Paused / Over time / Finished / Starts automatically at HH:MM), a 16:9 live preview of the display, three big transport buttons (Start or Pause, Reset, Next), a nudge row (−1 min, −10 s, +10 s, +1 min, +5 min, Prev, Blackout toggle, Flash), a "Message to speaker" panel (text, three colour swatches white/green/red, Bold, Uppercase, Flashing, Show, Hide), and a long "Remote displays & remote control" panel.
 - **Remote displays panel:** shows the four-digit Control PIN with a New PIN button, then three sections stacked: *On the venue Wi-Fi · desktop app* (QR + link, only in the desktop app), *Anywhere · room code* (Start a room, then QR, six-character code, link, Copy, connected count, Stop room), *Anywhere · your own relay* (relay URL input, Start relay room, then the same QR/code/link block). Each section has a Display / Remote control segmented switch that changes what the QR and link open.
 - **Dialogs:** Add/Edit timer (title, speaker, duration h/m/s, countdown or count up, yellow-at m/s, red-at m/s, at zero continue or stop, start manually / after previous / at a time of day), Appearance (background, digits, secondary text, yellow, red colour pickers; digit font condensed/mono/system; time-over alert style; time-over text; show/hide title, speaker, time of day, next up, progress bar; 24-hour clock; hide hours when zero), Export/Import (JSON textarea, Copy, Download, file picker, Load).
-- Below 820 px wide the two columns stack. The controller does work on a phone but is not designed for it.
+- **Mobile controller (a real surface, not a fallback).** Below 820 px the two columns stack: rundown first, then Now playing. People do run a show from a phone or tablet in the browser, so this layout has to be designed on purpose, not inherited. Today it has these problems: the transport buttons sit below the entire rundown, so Start is off-screen; the top bar wraps its five buttons into two or three rows; drag-to-reorder uses HTML5 drag and drop, which does not work on touch, so timers cannot be reordered on a phone; double-click-to-load has no touch equivalent; the explanation of "Open display window" lives in a hover tooltip that touch users never see; the per-card edit, duplicate and delete buttons are about 24 px tall; the full-screen exit button is drawn at 35% opacity and relies on hover, and there is no Escape key on a phone.
 
 ### 2.2 Speaker display (the output)
 
@@ -155,20 +155,22 @@ Keyboard: Space start/pause, R reset, N next, P previous, ↑/↓ ±1 min, Shift
 
 These are the UX issues the redesign should fix, roughly in priority order.
 
-1. **The running state is not loud enough on the controller.** "Running" is a 12 px muted status line. The active card gets a thin blue border. An operator glancing from across the room cannot tell if the clock is running or paused. Make running, paused and over time unmistakable in both columns.
-2. **The remote-displays panel is a wall of text.** Three transports, each with a paragraph, a toggle, a QR, a link and buttons, all stacked under the message panel. Most users will use exactly one. Needs progressive disclosure: pick one, see one. Explanations should move into help, not sit above every control.
-3. **Timer card meta line is cryptic.** `20:00 countdown ▲ 5:00 ▲ 1:00 overtime ▶ after previous Dr. Amara Okafor` in 12 px muted text with coloured triangles. Find a representation of the yellow and red thresholds that needs no legend, for example a tiny proportional bar.
-4. **Top bar treats five buttons as equals.** "Open display window" is the single most important action for a first-time user and looks like "Export".
-5. **No onboarding.** A sample rundown is loaded silently on first run. New users do not learn that there is a display window, a phone remote, or keyboard shortcuts. A light first-run path is wanted, without a tour that gets in the way of a returning operator.
-6. **Add timer dialog is fiddly.** Four groups of number inputs. Yellow-at and red-at need m and s each, and nothing stops red being larger than yellow. Presets (yellow at 5 / 2 / 1 min, red at 1 min / 30 s) and inline validation would help. The trigger dropdown hides the time input until "At a time of day" is chosen.
-7. **Appearance dialog has no preview.** You change colours and have to look at the preview behind the dialog.
-8. **Message panel has no presets.** The same three messages get typed at every event: wrap up, five minutes, Q&A next. Colour swatches have no text labels.
-9. **Display has no paused indicator** and no way to tell "stopped at zero" from "paused at zero".
-10. **Phone remote.** Connection status and PIN feedback sit at the bottom, below the fold on small phones. Buttons are 17 px text in a tight grid; the two most-used (Start/Pause, Next) should dominate. Blackout should look dangerous when on, since the speaker sees nothing.
-11. **Mobile controller layout** stacks the columns but keeps desktop-sized controls. Transport buttons should become thumb-sized below 820 px.
-12. **Danger actions are too close to safe ones.** Delete (✕) sits beside Duplicate on every card with no confirmation. Reset all sits beside Add timer.
-13. **Done timers only fade.** No visible check mark, no actual duration recorded against planned.
-14. **No empty state art.** "No timers yet" is a dashed box.
+1. **Keyboard shortcuts are hidden.** They live in a panel at the bottom of the rundown column. With eight timers in the list it scrolls off-screen, and a new operator never finds out that Space starts the clock. Only three buttons carry a key chip (Full-screen here, Blackout, Flash). Requirement: shortcuts are visible on the main page without looking for them. Put the key on every control that has one (Start = Space, Reset = R, Next = N, Prev = P, ±1 min = ↑ ↓, ±10 s = Shift ↑ ↓, Full-screen = F, Blackout = B, Flash = X, Message = M), and keep a compact always-visible strip or legend near the transport, never only inside a dialog or a panel you must scroll to. On touch devices the chips can hide, because there is no keyboard.
+2. **The mobile controller buries the controls.** See section 2.1. On a phone the Now playing block (status, preview, transport, nudges) must come first or the transport must be a sticky bar, the top bar must collapse to the one primary action plus a menu, timers need touch reordering (move up / move down, or a drag handle with pointer events), card actions need 44 px targets, delete needs a confirm or undo, and the full-screen exit must be a solid visible button.
+3. **The running state is not loud enough on the controller.** "Running" is a 12 px muted status line. The active card gets a thin blue border. An operator glancing from across the room cannot tell if the clock is running or paused. Make running, paused and over time unmistakable in both columns.
+4. **The remote-displays panel is a wall of text.** Three transports, each with a paragraph, a toggle, a QR, a link and buttons, all stacked under the message panel. Most users will use exactly one. Needs progressive disclosure: pick one, see one. Explanations should move into help, not sit above every control.
+5. **Timer card meta line is cryptic.** `20:00 countdown ▲ 5:00 ▲ 1:00 overtime ▶ after previous Dr. Amara Okafor` in 12 px muted text with coloured triangles. Find a representation of the yellow and red thresholds that needs no legend, for example a tiny proportional bar.
+6. **Top bar treats five buttons as equals.** "Open display window" is the single most important action for a first-time user and looks like "Export".
+7. **No onboarding.** A sample rundown is loaded silently on first run. New users do not learn that there is a display window, a phone remote, or keyboard shortcuts. A light first-run path is wanted, without a tour that gets in the way of a returning operator.
+8. **Add timer dialog is fiddly.** Four groups of number inputs. Yellow-at and red-at need m and s each, and nothing stops red being larger than yellow. Presets (yellow at 5 / 2 / 1 min, red at 1 min / 30 s) and inline validation would help. The trigger dropdown hides the time input until "At a time of day" is chosen.
+9. **Appearance dialog has no preview.** You change colours and have to look at the preview behind the dialog.
+10. **Message panel has no presets.** The same three messages get typed at every event: wrap up, five minutes, Q&A next. Colour swatches have no text labels.
+11. **Display has no paused indicator** and no way to tell "stopped at zero" from "paused at zero".
+12. **Phone remote.** Connection status and PIN feedback sit at the bottom, below the fold on small phones. Buttons are 17 px text in a tight grid; the two most-used (Start/Pause, Next) should dominate. Blackout should look dangerous when on, since the speaker sees nothing. Needs a clear disconnected state and a reconnecting state, and should hold up in landscape and on a tablet.
+13. **Mobile controller controls are desktop-sized.** Transport and nudge buttons should become thumb-sized below 820 px, and dialogs should open full-screen on a phone instead of a 560 px card.
+14. **Danger actions are too close to safe ones.** Delete (✕) sits beside Duplicate on every card with no confirmation. Reset all sits beside Add timer.
+15. **Done timers only fade.** No visible check mark, no actual duration recorded against planned.
+16. **No empty state art.** "No timers yet" is a dashed box.
 
 ## 8. Hard constraints on the redesign
 
@@ -178,18 +180,20 @@ These are the UX issues the redesign should fix, roughly in priority order.
 - Keep the semantic colours and their meanings.
 - Silent. No sound, no haptics, no suggestion of them.
 - Keyboard shortcuts stay and stay visible somewhere.
-- Must still work at 1024 px wide (old venue laptops) and on a 390 px phone for the remote.
+- Must still work at 1024 px wide (old venue laptops). The controller and the remote are both first-class at 390 px (phone) and 768 px (tablet); the controller is not allowed to be a squashed desktop.
+- On touch (`pointer: coarse`) every control is at least 44 px tall, nothing depends on hover, double-click or a tooltip, and nothing depends on the Escape key.
 - Respect `prefers-reduced-motion`.
 - Element ids and `data-` attributes in `index.html` are wired to JavaScript. A redesign that keeps them (or lists every rename) can be dropped in; one that invents a new structure cannot.
 - Accessibility: AA contrast, 44 px touch targets on the remote, visible focus, `aria-pressed` on toggles, dialogs stay native `<dialog>`.
 
 ## 9. What to deliver
 
-1. Controller at 1440, 1024 and 390 px wide, in the running, paused and over-time states.
-2. The speaker display in every state in the table in section 2.2, as a 16:9 frame.
-3. The phone remote at 390 px, connected with and without a valid PIN, and in the wrong-PIN state.
-4. Add timer dialog and Appearance dialog.
-5. The remote-displays area, redesigned with one transport visible at a time.
-6. A landing page, desktop and mobile.
-7. An updated token sheet in the exact `--name: value` form used in section 3, plus a component sheet (button variants, card, panel, input, segmented control, dialog).
-8. A change list: for every screen, which existing selector or id changes to what, so the design can be implemented in `index.html` by hand.
+1. Controller at 1440, 1024, 768 and 390 px wide, in the running, paused and over-time states. The 390 and 768 px versions must show how the transport reaches the top, how timers are reordered by touch, and how the top bar collapses.
+2. The keyboard shortcut treatment: key chips on the controls and the always-visible strip or legend, plus how it hides on touch.
+3. The speaker display in every state in the table in section 2.2, as a 16:9 frame.
+4. The phone remote at 390 px, connected with and without a valid PIN, and in the wrong-PIN state.
+5. Add timer dialog and Appearance dialog.
+6. The remote-displays area, redesigned with one transport visible at a time.
+7. A landing page, desktop and mobile.
+8. An updated token sheet in the exact `--name: value` form used in section 3, plus a component sheet (button variants, card, panel, input, segmented control, dialog).
+9. A change list: for every screen, which existing selector or id changes to what, so the design can be implemented in `index.html` by hand.

@@ -7,13 +7,13 @@ test('adds a timer through the dialog', async ({ page }) => {
   await page.fill('#tTitle', 'Closing remarks');
   await page.fill('#tSpeaker', 'Host');
   await page.fill('#tM', '7'); await page.fill('#tS', '30');
-  await page.selectOption('#tTrigger', 'scheduled');
+  await page.click('[data-seg="tTrigger"] [data-value="scheduled"]');
   await page.fill('#tStartAt', '16:45');
   await page.click('#tSave');
   const s = await readState(page);
   expect(s.timers).toHaveLength(2);
   expect(s.timers[1]).toMatchObject({ title: 'Closing remarks', speaker: 'Host', duration: 450, trigger: 'scheduled', startAt: '16:45' });
-  await expect(page.locator('#rundown .timer-card').nth(1)).toContainText('▶ at 16:45');
+  await expect(page.locator('#rundown .timer-card').nth(1)).toContainText('starts 16:45');
 });
 
 test('imports a 1.0 export and converts auto-next into a linked start', async ({ page }) => {

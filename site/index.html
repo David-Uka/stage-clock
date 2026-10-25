@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stage Clock · silent countdown timer for live events</title>
+<meta name="description" content="Free, open-source countdown timer for live events. Rundown on a laptop, big clock for the speaker, remote on a phone. Silent alerts: yellow, red, then a flashing screen.">
+<meta name="theme-color" content="#0b0d10">
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<meta property="og:title" content="Stage Clock">
+<meta property="og:description" content="A silent countdown timer for live events. Free, open source, works offline.">
+<meta property="og:image" content="https://david-uka.github.io/stage-clock/docs/brand/social-preview.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&family=Roboto+Mono:wght@500;700&display=swap">
+<style>
+:root {
+  --bg: #0b0d10; --panel: #14181d; --panel-2: #1b2128; --line: #2a323b; --fg: #e8ecf0; --muted: #8b96a3;
+  --accent: #3fb6ff; --accent-ink: #061018; --accent-hover: #63c4ff; --warn: #f5c518; --crit: #ff3b3b; --o-crit: #ff2d2d; --dim: #8a8a8a;
+  --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif; --font-cond: "Barlow Semi Condensed", "Barlow", "Arial Narrow", sans-serif; --font-mono: "Roboto Mono", "Consolas", "Menlo", monospace;
+  --radius: 8px; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 15px; line-height: 1.45; text-wrap: pretty; }
+a { color: var(--accent); }
+h1, h2, h3 { margin: 0; font-family: var(--font-cond); font-weight: 700; line-height: 1.05; text-wrap: balance; }
+.eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.mono { font-family: var(--font-mono); }
+.wrap { width: min(1280px, 100%); margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel-2); color: var(--fg); font-weight: 600; font-size: 16px; text-decoration: none; white-space: nowrap; }
+.btn:hover { background: #222a33; border-color: #3a4552; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.sm { padding: 7px 14px; font-size: 14px; }
+header.top { border-bottom: 1px solid var(--line); }
+header.top .wrap { display: flex; align-items: center; gap: 12px; padding-top: 16px; padding-bottom: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand b { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
+.brand .red { color: var(--crit); }
+nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+nav a.link { color: var(--fg); text-decoration: none; font-weight: 600; padding: 7px 10px; border-radius: var(--radius); }
+nav a.link:hover { background: var(--panel-2); }
+.hero { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; padding-block: 64px 48px; align-items: center; }
+.hero h1 { font-size: 56px; }
+.hero p.lead { font-size: 18px; color: var(--muted); margin: 0; max-width: 520px; }
+.hero .copy { display: flex; flex-direction: column; gap: 18px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; }
+.shot { position: relative; width: 100%; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: var(--panel); }
+.shot img { display: block; width: 100%; height: auto; }
+section.band { border-top: 1px solid var(--line); padding: 48px 0 56px; }
+.sectionhead { display: flex; flex-direction: column; gap: 4px; margin-bottom: 24px; }
+.sectionhead h2 { font-size: 32px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.frame { position: relative; width: 100%; aspect-ratio: 16 / 9; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; container-type: size; display: grid; grid-template-rows: auto 1fr auto; font-family: var(--font-cond); text-align: center; color: #fff; user-select: none; }
+.frame .t { display: flex; justify-content: space-between; padding: 2.5cqh 3cqw; font-size: 6cqh; font-weight: 600; }
+.frame .t span:last-child { font-size: 4.5cqh; color: var(--dim); }
+.frame .d { display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 36cqh; font-weight: 700; line-height: .9; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.frame .d small { font-size: 9cqh; letter-spacing: .08em; }
+.frame .b { padding: 2.5cqh 3cqw; font-size: 5cqh; color: var(--dim); text-align: left; }
+.frame .p { position: absolute; left: 0; right: 0; bottom: 0; height: 1.6cqh; background: rgba(255,255,255,.12); }
+.frame .p i { display: block; height: 100%; }
+.frame.over { background: var(--o-crit); }
+.frame.over .t span, .frame.over .b { color: #fff; }
+.cap b { display: block; margin-top: 10px; }
+.cap span { font-size: 13px; color: var(--muted); }
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card { padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
+.card b { display: block; }
+.card span { color: var(--muted); font-size: 13px; }
+.downloads { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.dl { text-decoration: none; color: var(--fg); padding: 16px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); display: flex; flex-direction: column; gap: 4px; }
+.dl:hover { border-color: #3a4552; }
+.dl b { font-size: 16px; }
+.dl span { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+.notes { grid-column: span 4; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 4px; }
+.note { padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--radius); font-size: 13px; color: var(--muted); }
+.note b { color: var(--fg); }
+p.alt { grid-column: span 4; margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+footer { border-top: 1px solid var(--line); }
+footer .wrap { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding-top: 20px; padding-bottom: 20px; font-size: 13px; color: var(--muted); }
+footer a { text-decoration: none; font-weight: 600; }
+footer .spacer { flex: 1; }
+@media (max-width: 900px) {
+  .hero, .split, .three, .downloads, .notes, .cards { grid-template-columns: 1fr; }
+  .hero { padding-block: 32px 24px; gap: 24px; }
+  .hero h1 { font-size: 38px; }
+  .hero p.lead { font-size: 15px; }
+  .sectionhead h2 { font-size: 26px; }
+  .notes { grid-column: auto; }
+  p.alt { grid-column: auto; }
+  nav a.link { display: none; }
+  .btn.hero-dl { flex: 1 1 100%; }
+  .split .shot { order: -1; }
+  .dl { min-height: 48px; flex-direction: row; align-items: center; justify-content: space-between; }
+}
+</style>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <a class="brand" href="./" style="text-decoration:none;color:inherit"><svg viewBox="0 0 120 120" width="28" height="28" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#2a323b" stroke-width="12"/><circle cx="60" cy="60" r="44" fill="none" stroke="#ff2d2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="193.4 276.5" transform="rotate(-90 60 60)"/><path d="M60 32v28l18 14" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg><b>STAGE <span class="red">CLOCK</span></b></a>
+  <nav><a class="link" href="#downloads">Downloads</a><a class="link" href="https://github.com/David-Uka/stage-clock">GitHub</a><a class="btn primary sm" href="../">Open in browser</a></nav>
+</div></header>
+
+<main>
+  <div class="wrap hero">
+    <div class="copy">
+      <span class="eyebrow">Free · open source · works offline</span>
+      <h1>A silent countdown timer for live events.</h1>
+      <p class="lead">Build the rundown on a laptop, put a big clock in front of the speaker, run the show from the laptop or a phone. The digits turn yellow, then red, then the screen flashes. No sound, ever.</p>
+      <div class="actions">
+        <a class="btn primary" href="../">Open in browser</a>
+        <a class="btn hero-dl" href="https://github.com/David-Uka/stage-clock/releases/latest">Download for Windows</a>
+        <a class="btn" href="https://github.com/David-Uka/stage-clock/releases/latest">macOS</a>
+        <a class="btn" href="https://github.com/David-Uka/stage-clock/releases/latest">Linux</a>
+      </div>
+      <span class="eyebrow" style="text-transform:none;letter-spacing:0;font-size:12px">No account. No server. Nothing leaves your machine. MIT licence.</span>
+    </div>
+    <div class="shot"><img src="../docs/screenshot-display.png" alt="The speaker display: large white digits on black with the title, speaker, time of day and the next segment" width="1280" height="720"></div>
+  </div>
+
+  <section class="band"><div class="wrap">
+    <div class="sectionhead"><span class="eyebrow">Silent alerts</span><h2>The speaker sees it. The room does not hear it.</h2></div>
+    <div class="three">
+      <div class="cap">
+        <div class="frame" aria-label="Display in the wrap-up phase"><div class="t"><span>Keynote</span><span>14:21</span></div><div class="d" style="color:var(--warn)">4:59</div><div class="b">Dr. Amara Okafor</div><div class="p"><i style="width:25%;background:var(--warn)"></i></div></div>
+        <b>Wrap up</b><span>Yellow at the time you set per timer, say five minutes out.</span>
+      </div>
+      <div class="cap">
+        <div class="frame" aria-label="Display in the final phase"><div class="t"><span>Keynote</span><span>14:25</span></div><div class="d" style="color:var(--o-crit)">0:59</div><div class="b">Dr. Amara Okafor</div><div class="p"><i style="width:5%;background:var(--o-crit)"></i></div></div>
+        <b>Final stretch</b><span>Red for the last minute, or whatever you choose.</span>
+      </div>
+      <div class="cap">
+        <div class="frame over" aria-label="Display over time"><div class="t"><span>Keynote</span><span>14:27</span></div><div class="d" style="font-size:30cqh">+0:42<small>TIME'S UP</small></div><div class="b">Dr. Amara Okafor</div></div>
+        <b>Over time</b><span>The screen flashes red and counts up. Or stays solid, or just blinks the digits. Your call.</span>
+      </div>
+    </div>
+  </div></section>
+
+  <section class="band"><div class="wrap split">
+    <div class="shot"><img src="../docs/screenshot-controller.png" alt="The controller: rundown on the left, live preview and transport on the right" width="1280" height="800" loading="lazy"></div>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <span class="eyebrow">Displays and remotes</span>
+      <h2 style="font-size:32px">Any screen can be the clock. Any phone can be the remote.</h2>
+      <div class="cards">
+        <div class="card"><b>Second screen</b><span>Open display window, drag it to the projector. Or press F.</span></div>
+        <div class="card"><b>Venue Wi-Fi</b><span>Desktop app only. Scan a QR, no internet needed.</span></div>
+        <div class="card"><b>Room code</b><span>Six characters, works anywhere with internet.</span></div>
+        <div class="card"><b>Your own relay</b><span>A free Cloudflare Worker you run. No third party.</span></div>
+      </div>
+      <p style="margin:0;color:var(--muted)">Every link also opens as a <b style="color:var(--fg)">phone remote</b>: Start, Next, ±1 min and a message box, protected by a four-digit PIN shown on the controller. Watching never needs the PIN.</p>
+    </div>
+  </div></section>
+
+  <section class="band" id="downloads"><div class="wrap">
+    <div class="sectionhead"><span class="eyebrow">Downloads</span><h2>Get it</h2></div>
+    <div class="downloads">
+      <a class="dl" href="https://github.com/David-Uka/stage-clock/releases/latest"><b>Windows installer</b><span>.exe · x64</span></a>
+      <a class="dl" href="https://github.com/David-Uka/stage-clock/releases/latest"><b>Windows portable</b><span>.exe · no install</span></a>
+      <a class="dl" href="https://github.com/David-Uka/stage-clock/releases/latest"><b>macOS</b><span>.dmg · Apple silicon</span></a>
+      <a class="dl" href="https://github.com/David-Uka/stage-clock/releases/latest"><b>Linux</b><span>.AppImage</span></a>
+      <div class="notes">
+        <div class="note"><b>First open on Windows.</b> The builds are not code-signed yet. If SmartScreen appears, click <b>More info → Run anyway</b>.</div>
+        <div class="note"><b>First open on macOS.</b> The first open says “Not Opened”. Click Done, then <b>System Settings → Privacy &amp; Security → Open Anyway</b>. It never asks again.</div>
+      </div>
+      <p class="alt">Or skip the download: open it in Edge or Chrome and click the install icon in the address bar.</p>
+    </div>
+  </div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>Free and open source · MIT licence</span>
+  <a href="https://github.com/David-Uka/stage-clock">github.com/David-Uka/stage-clock</a>
+  <span class="spacer"></span>
+  <span>One HTML file. No framework. No sound.</span>
+</div></footer>
+</body>
+</html>

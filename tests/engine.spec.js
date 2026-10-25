@@ -17,7 +17,8 @@ test('stops at zero when told to', async ({ page }) => {
   await openWithState(page, stateWith([t]));
   await page.click('#btnPlay');
   await expect(page.locator('#preview .o-time')).toHaveText('00:00', { timeout: 4000 });
-  await expect(page.locator('#statusLine')).toHaveText('Finished');
+  await expect(page.locator('#statusLine')).toHaveAttribute('data-state', 'finished');
+  await expect(page.locator('#preview')).toHaveClass(/stopped/);
   expect((await readState(page)).running).toBe(false);
 });
 

@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { timer, stateWith, openWithState } = require('./helpers');
+const { timer, stateWith, openWithState, openTransport } = require('./helpers');
 
 // A fake PeerJS: records connections and lets the test drive both ends without the public signalling service.
 const fakePeer = () => {
@@ -16,6 +16,7 @@ const fakePeer = () => {
 test('controller starts a room, shows code, link and QR, and streams state to a joined display', async ({ page }) => {
   await page.addInitScript(fakePeer);
   await openWithState(page, stateWith([timer({ title: 'Keynote' })]));
+  await openTransport(page, 'room');
   await page.click('#roomStart');
   await expect(page.locator('#roomOn')).toBeVisible();
   const code = await page.locator('#roomCode').textContent();

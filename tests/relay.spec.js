@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { WebSocketServer } = require('ws');
-const { timer, stateWith, openWithState } = require('./helpers');
+const { timer, stateWith, openWithState, openTransport } = require('./helpers');
 
 // A tiny stand-in for the Cloudflare relay (relay/src/index.js), speaking the same protocol.
 let wss, relayUrl;
@@ -24,6 +24,7 @@ test.afterAll(() => wss.close());
 
 test('controller hosts a relay room and a display joins through the link', async ({ page, context }) => {
   await openWithState(page, stateWith([timer({ title: 'Relayed' })]));
+  await openTransport(page, 'relay');
   await page.fill('#relayUrl', relayUrl);
   await page.click('#relayStart');
   await expect(page.locator('#relayOn')).toBeVisible();
@@ -50,12 +51,14 @@ test('controller hosts a relay room and a display joins through the link', async
 
 test('relay address is remembered and validated', async ({ page }) => {
   await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'relay');
   await page.click('#relayStart');
   await expect(page.locator('#relayError')).toHaveText('Enter the relay address first.');
   await page.fill('#relayUrl', 'not a url'); await page.click('#relayStart');
   await expect(page.locator('#relayError')).toContainText('not a valid URL');
   await page.fill('#relayUrl', 'https://relay.example.com/'); await page.locator('#relayUrl').blur();
   await page.reload();
+  await openTransport(page, 'relay');
   await expect(page.locator('#relayUrl')).toHaveValue('https://relay.example.com/');
 });
 

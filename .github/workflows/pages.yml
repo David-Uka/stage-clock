@@ -20,12 +20,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Collect the static site
         run: |
-          mkdir -p site
-          cp index.html manifest.webmanifest sw.js icon.svg icon-192.png icon-512.png icon-maskable-512.png site/
-          cp -r vendor site/
+          mkdir -p _pages/site _pages/docs
+          cp index.html manifest.webmanifest sw.js icon.svg icon-192.png icon-512.png icon-maskable-512.png _pages/
+          cp -r vendor _pages/
+          cp site/index.html _pages/site/
+          cp docs/screenshot-*.png _pages/docs/
+          mkdir -p _pages/docs/brand && cp docs/brand/social-preview.png _pages/docs/brand/
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _pages
       - id: deployment
         uses: actions/deploy-pages@v4

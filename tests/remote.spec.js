@@ -1,5 +1,5 @@
 const { test, expect } = require('@playwright/test');
-const { timer, stateWith, openWithState } = require('./helpers');
+const { timer, stateWith, openWithState, openTransport } = require('./helpers');
 
 test('remote display applies pushed state and corrects for clock offset', async ({ page }) => {
   await page.goto('/index.html?view=output&lan=1');
@@ -27,6 +27,7 @@ test('remote display ignores malformed messages', async ({ page }) => {
 
 test('controller in a plain browser explains that Wi-Fi displays need the desktop app', async ({ page }) => {
   await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'lan');
   await expect(page.locator('#lanUnavailable')).toBeVisible();
   await expect(page.locator('#lanRemote')).toBeHidden();
 });
@@ -41,6 +42,7 @@ test('controller with the desktop bridge shows the link, QR code and client coun
     };
   });
   await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'lan');
   await expect(page.locator('#lanRemote')).toBeVisible();
   await expect(page.locator('#lanUrl')).toHaveValue('http://192.168.1.20:4455/?view=output&lan=1');
   await expect(page.locator('#lanQr svg')).toHaveCount(1);

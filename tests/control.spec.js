@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const { WebSocketServer } = require('ws');
-const { timer, stateWith, openWithState, readState } = require('./helpers');
+const { timer, stateWith, openWithState, readState, openTransport } = require('./helpers');
 
 const fakePeer = () => {
   class Emitter { constructor() { this.h = {}; } on(e, f) { (this.h[e] ||= []).push(f); return this; } emit(e, ...a) { (this.h[e] || []).forEach(f => f(...a)); } }
@@ -36,6 +36,7 @@ test('controller applies commands with the right PIN and refuses the wrong one',
 test('the PIN never leaves the controller in pushed state', async ({ page }) => {
   await page.addInitScript(fakePeer);
   await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'room');
   await page.click('#roomStart');
   await expect(page.locator('#roomOn')).toBeVisible();
   await page.evaluate(() => { const c = new window.__Conn('d'); window.__dc = c; window.__peers[0].emit('connection', c); c.open = true; c.emit('open'); });
@@ -47,6 +48,7 @@ test('the PIN never leaves the controller in pushed state', async ({ page }) => 
 test('room host answers phone commands over the data channel', async ({ page }) => {
   await page.addInitScript(fakePeer);
   await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'room');
   await page.click('#roomStart');
   await expect(page.locator('#roomOn')).toBeVisible();
   const pin = await page.locator('#pinValue').textContent();
@@ -71,7 +73,7 @@ test('phone remote page sends commands with the PIN and shows the result', async
   const sent = await page.evaluate(() => window.__conns[0].sent.at(-1));
   expect(sent).toMatchObject({ type: 'command', action: 'play', pin: '4821' });
   await page.evaluate(id => window.__conns[0].emit('data', { type: 'ack', id, ok: false, reason: 'Wrong PIN' }), sent.id);
-  await expect(page.locator('#rPinMsg')).toHaveText('Wrong PIN');
+  await expect(page.locator('#rPinMsg')).toContainText('Wrong PIN');
   const s = stateWith([timer({ title: 'Keynote', duration: 600 })], { running: true }); s.endAt = Date.now() + 600000;
   await page.evaluate(st => window.__conns[0].emit('data', { type: 'state', state: st, sentAt: Date.now() }), s);
   await expect(page.locator('#rTitle')).toHaveText('Keynote');
@@ -97,6 +99,7 @@ test('desktop bridge routes phone commands to the controller and replies to that
   expect(await page.evaluate(() => window.__replies)).toEqual([[7, { type: 'ack', id: 'z', ok: true }]]);
   expect((await readState(page)).running).toBe(true);
   // Link switch: the same QR can point at the remote page
+  await openTransport(page, 'lan');
   await page.click('.seg[data-seg="lan"] [data-kind="remote"]');
   await expect(page.locator('#lanUrl')).toHaveValue('http://192.168.1.20:4455/?view=remote&lan=1');
 });
@@ -117,6 +120,7 @@ test('relay: a phone remote controls the timer end to end', async ({ page, conte
     ws.on('close', () => room.sockets.delete(ws));
   });
   await openWithState(page, stateWith([timer({ title: 'Relayed', duration: 300 })]));
+  await openTransport(page, 'relay');
   await page.fill('#relayUrl', relayUrl); await page.click('#relayStart');
   await expect(page.locator('#relayOn')).toBeVisible();
   await page.click('.seg[data-seg="relay"] [data-kind="remote"]');

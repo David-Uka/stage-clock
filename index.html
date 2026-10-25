@@ -11,7 +11,8 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@600;700&family=Roboto+Mono:wght@500;700&display=swap">
 <style>
-/* Layout: a dark control room. Left: the rundown. Right: the live preview and transport. The output is the same renderer, blown up to the whole screen. */
+/* Layout: a dark control room. Left: the rundown. Right: the live preview and transport. The output is the same renderer, blown up to the whole screen.
+   The state of the show (running / paused / over time) is one visual language repeated on the status bar, the preview frame, the active card, the transport buttons and the phone remote. */
 :root {
   --bg: #0b0d10;
   --panel: #14181d;
@@ -21,13 +22,27 @@
   --muted: #8b96a3;
   --accent: #3fb6ff;
   --accent-ink: #061018;
+  --accent-hover: #63c4ff;
   --ok: #37d67a;
   --warn: #f5c518;
   --crit: #ff3b3b;
+  --danger-text: #ffb3b3;
+  --btn-hover: #222a33;
+  --btn-hover-line: #3a4552;
+  --active-bg: #12222e;
+  --track: #3a4552;
+  --state-run: #37d67a;
+  --state-run-bg: #15301f;
+  --state-over-bg: #341b1f;
+  --state-pause-bg: repeating-linear-gradient(135deg, var(--panel-2) 0 8px, var(--panel) 8px 16px);
+  --toggle-ink: #231a00;
+  --tap: 44px;
   --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
   --font-cond: "Barlow Semi Condensed", "Barlow", "Arial Narrow", sans-serif;
   --font-mono: "Roboto Mono", "Consolas", "Menlo", monospace;
   --radius: 8px;
+  --radius-sm: 6px;
+  --radius-lg: 12px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -45,30 +60,39 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 h1, h2, h3 { margin: 0; text-wrap: balance; }
 .eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.spacer { flex: 1; }
+
+/* ---------- state tokens: one language for running / paused / over ---------- */
+[data-state] { --st: var(--accent); --st-bg: var(--active-bg); --st-dot: var(--accent); --st-ink: var(--fg); }
+[data-state="running"] { --st: var(--state-run); --st-bg: var(--state-run-bg); --st-dot: var(--state-run); --st-ink: var(--state-run); }
+[data-state="paused"] { --st: var(--track); --st-bg: var(--state-pause-bg); --st-dot: var(--muted); --st-ink: var(--fg); }
+[data-state="over"], [data-state="finished"] { --st: var(--crit); --st-bg: var(--state-over-bg); --st-dot: var(--crit); --st-ink: var(--danger-text); }
 
 /* ---------- controller frame ---------- */
-#controller {
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100%;
-}
+#controller { display: grid; grid-template-rows: auto auto 1fr; height: 100%; }
 .topbar {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  position: relative; z-index: 20;
+  display: flex; align-items: center; gap: 8px;
   padding-block: 10px;
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .brand .mark { flex: none; }
 .brand .red { color: var(--crit); }
-.brand h1 { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .02em; }
+.brand h1 { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
 .brand .clock { font-family: var(--font-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
-.topbar .spacer { flex: 1; }
+.topbar .divider { width: 1px; height: 22px; background: var(--line); }
+.topmenu { display: contents; }
+#btnMore { display: none; }
+#btnPopout svg { flex: none; }
 .main {
   display: grid;
-  grid-template-columns: minmax(300px, 1fr) minmax(360px, 1.2fr);
+  grid-template-columns: minmax(300px, 1fr) minmax(360px, 1fr);
   gap: 0;
   min-height: 0;
 }
@@ -79,13 +103,14 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
 .col.left { border-right: 1px solid var(--line); }
-@media (max-width: 820px) {
-  body { overflow: auto; }
-  #controller { height: auto; min-height: 100%; }
-  .main { grid-template-columns: 1fr; }
-  .col { overflow: visible; }
-  .col.left { border-right: 0; border-bottom: 1px solid var(--line); }
-}
+
+/* first run strip: shown while the sample rundown is loaded, until "Got it" */
+.firstrun { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 10px 16px; background: var(--active-bg); border-bottom: 1px solid var(--line); font-size: 13px; }
+.firstrun .eyebrow { color: var(--accent); }
+.firstrun .step { display: inline-flex; align-items: center; gap: 8px; }
+.firstrun .step b.n { font-family: var(--font-mono); color: var(--accent); }
+.firstrun kbd { font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; }
+.firstrun[hidden] { display: none; }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -95,83 +120,196 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   font-weight: 600; white-space: nowrap;
   transition: background .12s, border-color .12s, transform .05s;
 }
-.btn:hover { background: #222a33; border-color: #3a4552; }
+.btn:hover { background: var(--btn-hover); border-color: var(--btn-hover-line); }
 .btn:active { transform: translateY(1px); }
-.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.btn.primary:hover { background: #63c4ff; }
-.btn.danger { color: #ffb3b3; }
+.btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn.danger { color: var(--danger-text); }
 .btn.danger:hover { border-color: var(--crit); }
-.btn.small { padding: 4px 8px; font-size: 12px; }
-.btn.big { padding: 14px 18px; font-size: 18px; font-family: var(--font-cond); letter-spacing: .04em; text-transform: uppercase; }
-.btn.toggle[aria-pressed="true"] { background: var(--warn); color: #231a00; border-color: var(--warn); }
-.btn kbd { font-family: var(--font-mono); font-size: 10px; opacity: .6; border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; }
+.btn.quiet { background: transparent; border-color: transparent; }
+.btn.quiet:hover { background: var(--btn-hover); border-color: var(--btn-hover-line); }
+.btn.small { padding: 4px 8px; font-size: 12px; border-radius: var(--radius-sm); }
+.btn.big { padding: 12px 18px; min-height: 52px; font-size: 18px; font-family: var(--font-cond); letter-spacing: .04em; text-transform: uppercase; }
+.btn.help { width: 32px; height: 32px; padding: 0; border-radius: 999px; background: transparent; font-weight: 700; }
+.btn.toggle[aria-pressed="true"] { background: var(--state-over-bg); color: var(--danger-text); border-color: var(--crit); }
+.btn[data-state="running"] { background: var(--state-run-bg); color: var(--state-run); border-color: var(--state-run); box-shadow: inset 0 0 0 1px var(--state-run); }
+.btn[data-state="over"] { background: var(--state-over-bg); color: var(--danger-text); border-color: var(--crit); box-shadow: inset 0 0 0 1px var(--crit); }
+.btn[data-confirm] { background: var(--state-over-bg); color: var(--danger-text); border-color: var(--crit); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.pill { border-radius: 999px; }
+
+/* ---------- segmented control ---------- */
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+.seg button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: var(--panel-2); border: 0; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg > .btn { border: 0; border-radius: 0; background: var(--panel-2); color: var(--muted); padding: 6px 10px; font-size: 12px; }
+.seg > .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.seg.fill { display: flex; width: 100%; }
+.seg.fill button { flex: 1; padding: 8px 8px; font-size: 13px; }
+.seg.tabs button { padding: 6px 14px; }
+.seg .dot { width: 10px; height: 10px; }
+.seg button[aria-pressed="true"] .dot.white { border: 1px solid var(--accent-ink); }
+.dot.white { background: #fff; } .dot.green { background: var(--ok); } .dot.red { background: var(--crit); }
 
 /* ---------- rundown ---------- */
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .section-head h2 { font-family: var(--font-cond); font-size: 18px; font-weight: 700; }
 #rundown { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .timer-card {
-  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center;
+  display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 7px 12px; align-items: center;
   padding: 10px 12px; border-radius: var(--radius);
   border: 1px solid var(--line); background: var(--panel);
-  cursor: grab;
+  cursor: grab; position: relative;
 }
 .timer-card.dragging { opacity: .4; }
 .timer-card.drop-before { box-shadow: 0 -3px 0 0 var(--accent); }
-.timer-card.active { border-color: var(--accent); background: #12222e; }
-.timer-card.done { opacity: .55; }
-.timer-card .idx { font-family: var(--font-mono); color: var(--muted); font-size: 12px; width: 22px; text-align: right; }
+.timer-card.active { border-color: var(--accent); background: var(--active-bg); }
+.timer-card.active[data-state="running"] { border-color: var(--state-run); background: var(--state-run-bg); }
+.timer-card.active[data-state="over"], .timer-card.active[data-state="finished"] { border-color: var(--crit); background: var(--state-over-bg); }
+.timer-card.done { opacity: .8; }
+.timer-card .idx { grid-row: span 2; align-self: start; padding-top: 3px; font-family: var(--font-mono); color: var(--muted); font-size: 12px; text-align: right; }
+.timer-card.done .idx { color: var(--ok); }
+.timer-card .body { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
 .timer-card .title { font-weight: 600; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.timer-card .meta { color: var(--muted); font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
-.timer-card .meta .dur { font-family: var(--font-mono); color: var(--fg); font-variant-numeric: tabular-nums; }
-.timer-card .meta .w { color: var(--warn); } .timer-card .meta .c { color: var(--crit); }
-.timer-card .actions { display: flex; gap: 4px; }
-.timer-card .actions .btn { padding: 4px 7px; }
-.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); }
-.total { color: var(--muted); font-size: 12px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+.timer-card.done .title { color: var(--muted); }
+.timer-card .sub { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.timer-card .right { display: flex; align-items: center; gap: 8px; justify-self: end; min-height: 22px; font-variant-numeric: tabular-nums; }
+.timer-card .right .dur { font-family: var(--font-mono); font-size: 14px; font-weight: 500; }
+.timer-card .state { display: inline-flex; align-items: center; gap: 7px; }
+.timer-card .state .dot { background: var(--st-dot); }
+.timer-card .state b { font-family: var(--font-cond); font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--st-ink); }
+.timer-card .state .live { font-family: var(--font-mono); font-size: 16px; font-weight: 700; color: var(--st-ink); }
+.timer-card .done-meta { font-size: 12px; color: var(--muted); }
+.timer-card .done-meta b { color: var(--fg); }
+.timer-card .done-meta b.late { color: var(--danger-text); }
+.timer-card .bar { position: relative; height: 6px; border-radius: 3px; background: var(--track); }
+.timer-card.done .bar { opacity: .35; }
+.timer-card .bar .playhead { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--fg); }
+.timer-card .actions { display: flex; gap: 4px; justify-self: end; position: relative; }
+.timer-card .actions .btn { padding: 3px 8px; font-size: 12px; min-height: 24px; }
+.timer-card .actions .btn.icon { width: 26px; padding: 0; }
+.card-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 10; display: flex; flex-direction: column; min-width: 150px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); overflow: hidden; font-size: 13px; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.card-menu[hidden] { display: none; }
+.card-menu button { border: 0; background: transparent; color: var(--fg); padding: 9px 14px; text-align: left; border-top: 1px solid var(--line); }
+.card-menu button:first-child { border-top: 0; }
+.card-menu button:hover { background: var(--btn-hover); }
+.card-menu button.danger { color: var(--danger-text); }
+.card-menu button[data-confirm] { background: var(--state-over-bg); font-weight: 600; }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--line); border-radius: var(--radius); display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.empty b { font-family: var(--font-cond); font-size: 18px; color: var(--fg); }
+.empty .row { justify-content: center; }
+.total { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 10px; font-variant-numeric: tabular-nums; }
 
 /* ---------- now playing ---------- */
-.preview-wrap { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; position: relative; }
+.status { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border: 2px solid var(--st); border-bottom: 0; border-radius: var(--radius) var(--radius) 0 0; background: var(--st-bg); min-height: 42px; }
+.status .dot { width: 12px; height: 12px; background: var(--st-dot); }
+.status b { font-family: var(--font-cond); font-size: 20px; font-weight: 700; letter-spacing: .06em; line-height: 1; text-transform: uppercase; white-space: nowrap; }
+.status .detail { font-family: var(--font-mono); font-size: 14px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--st-ink); }
+.status[data-state="running"] .detail, .status[data-state="paused"] .detail, .status[data-state="ready"] .detail, .status[data-state="scheduled"] .detail { color: var(--fg); }
+.preview-wrap { border: 2px solid var(--st); border-radius: 0 0 var(--radius) var(--radius); overflow: hidden; background: #000; aspect-ratio: 16 / 9; max-width: 100%; position: relative; }
+.preview-wrap.plain { border: 1px solid var(--line); border-radius: var(--radius); }
 .preview-wrap .output { position: absolute; inset: 0; }
 .transport { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
-.transport .wide { grid-column: span 3; }
-.nudge { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.nudgerow { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
+.nudge, .extras { display: flex; gap: 6px; flex-wrap: wrap; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .panel { margin-top: 16px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); }
-.panel h3 { font-family: var(--font-cond); font-size: 16px; margin-bottom: 8px; }
+.panel h3 { font-family: var(--font-cond); font-size: 16px; }
+.panel .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.chip.on { border-color: var(--state-run); color: var(--state-run); background: var(--state-run-bg); }
+.presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.presets .btn.small { border-radius: 999px; padding: 4px 10px; }
+.presets input { width: 10em; flex: 1 1 120px; }
 .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.field label { font-size: 12px; color: var(--muted); font-weight: 600; }
-input[type="text"], input[type="number"], input[type="time"], select, textarea {
-  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 7px 9px; min-width: 0; width: 100%;
+.field label, .label { font-size: 12px; color: var(--muted); font-weight: 600; }
+input[type="text"], input[type="number"], input[type="time"], input[type="url"], select, textarea {
+  background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 7px 9px; min-width: 0; width: 100%;
 }
-input[type="number"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
-input[type="color"] { width: 44px; height: 32px; padding: 2px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+input[type="number"], input[type="time"] { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+input.bad { border-color: var(--crit); }
+input:disabled { opacity: .6; }
 .hms { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
 .hms input { text-align: center; }
 .hms span { display: block; text-align: center; font-size: 10px; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: .08em; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-@media (max-width: 480px) { .grid3 { grid-template-columns: 1fr; } .grid2 { grid-template-columns: 1fr; } }
 .check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.msg-colors { display: flex; gap: 6px; }
-.msg-colors .btn { width: 36px; height: 32px; padding: 0; }
-.msg-colors .btn[data-c="white"] { background: #fff; } .msg-colors .btn[data-c="green"] { background: var(--ok); } .msg-colors .btn[data-c="red"] { background: var(--crit); }
-.msg-colors .btn[aria-pressed="true"] { outline: 2px solid var(--accent); outline-offset: 2px; }
 .hint { color: var(--muted); font-size: 12px; }
-.shortcuts { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 12px; color: var(--muted); }
-.shortcuts kbd { font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--fg); }
+.hint.bad { color: var(--danger-text); }
+.shortcuts { display: grid; grid-template-columns: auto 1fr auto 1fr; gap: 6px 12px; font-size: 13px; color: var(--muted); align-items: center; }
+kbd { font-family: var(--font-mono); background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px; color: var(--fg); font-size: 12px; justify-self: start; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+
+/* thresholds in the timer dialog */
+.thresholds { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); }
+.thresholds .grid { display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; align-items: center; font-size: 12px; }
+.thresholds .grid > label { color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.thresholds .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.thresholds .custom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 220px; }
+.thresholds .custom[hidden] { display: none; }
+#tBar { height: 8px; border-radius: 4px; background: var(--track); margin-top: 4px; }
+.barlabels { position: relative; height: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.barlabels span { position: absolute; top: 2px; white-space: nowrap; }
+.barlabels .w { color: var(--warn); transform: translateX(-50%); } .barlabels .c { color: var(--crit); right: 0; }
+.foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; align-items: center; }
+.foot .left { margin-right: auto; }
+
+/* appearance dialog */
+#settingsDialog { width: min(760px, calc(100vw - 32px)); }
+.appearance { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+.swatches { display: flex; flex-direction: column; gap: 6px; }
+label.swatch { position: relative; display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); font-size: 13px; cursor: pointer; }
+label.swatch:hover { border-color: var(--btn-hover-line); }
+label.swatch .chipc { width: 28px; height: 22px; border-radius: 4px; border: 1px solid var(--line); }
+label.swatch .hex { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+label.swatch input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
+.previewhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.checks { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; margin-top: 10px; }
 
 /* ---------- dialogs ---------- */
 dialog {
-  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 12px;
+  background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: var(--radius-lg);
   padding: 18px; width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
 }
 dialog::backdrop { background: rgba(0,0,0,.6); }
 dialog h2 { font-family: var(--font-cond); font-size: 20px; margin-bottom: 12px; }
 dialog .form { display: flex; flex-direction: column; gap: 12px; }
-dialog .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+dialog .dhead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+dialog .dhead h2 { margin: 0; }
 textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180px; white-space: pre; }
+
+/* ---------- remote displays panel ---------- */
+details.panel > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+details.panel > summary::-webkit-details-marker { display: none; }
+details.panel > summary .chev { color: var(--muted); font-size: 12px; width: 10px; }
+details.panel > summary .chev::before { content: "▸"; }
+details.panel[open] > summary .chev::before { content: "▾"; }
+details.panel[open] > summary { margin-bottom: 10px; }
+details.panel > summary h3 { margin: 0; }
+details.panel .tabs { margin-bottom: 10px; }
+section[data-transport] { display: flex; flex-direction: column; gap: 10px; }
+section[data-transport][hidden] { display: none; }
+.clients::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: 1px; }
+.clients.on::before { background: var(--ok); }
+.notice { display: flex; gap: 14px; align-items: center; padding: 12px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.notice svg { flex: none; }
+.notice b { display: block; }
+details.help { font-size: 12px; color: var(--muted); }
+details.help summary { cursor: pointer; list-style: none; display: flex; gap: 6px; align-items: center; }
+details.help summary::-webkit-details-marker { display: none; }
+details.help summary::before { content: "▸"; }
+details.help[open] summary::before { content: "▾"; }
+details.help summary b { color: var(--fg); }
+details.help p { margin: 6px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--bg); }
+.roomcode { font-family: var(--font-mono); font-size: 28px; letter-spacing: .18em; font-weight: 700; color: var(--accent); line-height: 1; }
+.qr { width: 148px; height: 148px; flex: none; background: #fff; padding: 8px; border-radius: var(--radius-sm); }
+.qr svg { width: 100%; height: 100%; display: block; }
+.pinbox { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.pinbox b { font-family: var(--font-mono); font-size: 15px; letter-spacing: .2em; color: var(--fg); }
+#remoteCodeSummary b { font-family: var(--font-mono); color: var(--accent); letter-spacing: .12em; }
 
 /* ---------- OUTPUT (speaker display) ---------- */
 .output {
@@ -188,6 +326,9 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output .o-top, .output .o-bottom { display: flex; justify-content: space-between; align-items: center; gap: 2cqw; padding: 2.5cqh 3cqw; min-width: 0; }
 .output .o-title { font-size: 6cqh; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .output .o-clock { font-size: 4.5cqh; color: var(--o-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.output .o-paused { display: none; align-items: center; gap: 1.2cqw; font-size: 3.6cqh; letter-spacing: .1em; color: var(--o-dim); white-space: nowrap; }
+.output .o-paused i { display: block; width: .9cqw; height: 3cqh; background: currentColor; }
+.output.paused .o-paused { display: inline-flex; }
 .output .o-speaker { font-size: 5cqh; color: var(--o-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
 .output .o-next { font-size: 3.6cqh; color: var(--o-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .output .o-next b { color: var(--o-fg); font-weight: 600; }
@@ -203,6 +344,7 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output .o-time.len8 { font-size: min(36cqh, 16.5cqw); }
 .output .o-time.len9 { font-size: min(36cqh, 14.5cqw); }
 .output .o-endtext { font-size: 9cqh; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-top: 1cqh; min-height: 9cqh; }
+.output .o-endtext.sched { color: var(--o-dim); text-transform: none; letter-spacing: .02em; font-weight: 600; }
 .output .o-progress { position: absolute; left: 0; right: 0; bottom: 0; height: 1.6cqh; background: rgba(255,255,255,.12); }
 .output .o-progress i { display: block; height: 100%; width: 100%; background: var(--o-fg); transition: width .25s linear; }
 .output .o-message {
@@ -216,15 +358,12 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output .o-message.green { color: #37d67a; } .output .o-message.red { color: #ff3b3b; }
 .output .o-message.flash { animation: msgflash 1s steps(2, start) infinite; }
 .output .o-blackout { position: absolute; inset: 0; background: #000; display: none; }
-.output .o-conn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 5cqh; color: var(--o-dim); display: none; text-align: center; padding: 2cqh 4cqw; }
+.output .o-conn { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 5cqh; color: var(--o-dim); display: none; text-align: center; padding: 2cqh 4cqw; width: 100%; }
 .output.no-source .o-conn { display: block; }
 .output.no-source .o-mid, .output.no-source .o-top, .output.no-source .o-bottom, .output.no-source .o-progress { visibility: hidden; }
-.roomcode { font-family: var(--font-mono); font-size: 28px; letter-spacing: .18em; font-weight: 700; color: var(--accent); }
 .output .o-conn form { display: flex; gap: 8px; justify-content: center; margin-top: 2cqh; font-family: var(--font-ui); }
-.output .o-conn input { font-size: 3.5cqh; width: 9em; text-align: center; letter-spacing: .2em; text-transform: uppercase; background: #000; color: #fff; border: 1px solid #555; border-radius: 6px; padding: .3em .5em; }
-.output .o-conn button { font-size: 3.5cqh; background: #fff; color: #000; border: 0; border-radius: 6px; padding: .3em .8em; }
-.qr { width: 148px; height: 148px; flex: none; background: #fff; padding: 8px; border-radius: 6px; }
-.qr svg { width: 100%; height: 100%; display: block; }
+.output .o-conn input { font-size: 3.5cqh; width: 9em; text-align: center; letter-spacing: .2em; text-transform: uppercase; background: #000; color: #fff; border: 1px solid #555; border-radius: 6px; padding: .3em .5em; font-family: var(--font-mono); }
+.output .o-conn button { font-size: 3.5cqh; background: #fff; color: #000; border: 0; border-radius: 6px; padding: .3em .8em; font-weight: 600; }
 .output.blackout .o-blackout { display: block; }
 .output.blackout .o-message { display: none; }
 
@@ -234,10 +373,13 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 .output.over .o-progress i { background: var(--o-crit); }
 .output.over .o-time { color: var(--o-crit); }
 .output.over[data-end="solid"] { background: var(--o-crit); }
-.output.over[data-end="solid"] .o-time, .output.over[data-end="solid"] .o-endtext, .output.over[data-end="solid"] .o-title, .output.over[data-end="solid"] .o-speaker, .output.over[data-end="solid"] .o-clock, .output.over[data-end="solid"] .o-next { color: #fff; }
+.output.over[data-end="solid"] .o-time, .output.over[data-end="solid"] .o-endtext, .output.over[data-end="solid"] .o-title, .output.over[data-end="solid"] .o-speaker, .output.over[data-end="solid"] .o-clock, .output.over[data-end="solid"] .o-next, .output.over[data-end="solid"] .o-paused { color: #fff; }
 .output.over[data-end="flash"] { animation: bgflash 1s steps(2, start) infinite; }
 .output.over[data-end="flash"] .o-time, .output.over[data-end="flash"] .o-endtext { color: #fff; }
 .output.over[data-end="text"] .o-time { animation: textflash 1s steps(2, start) infinite; }
+/* stopped at zero: red digits and text, no counting up, never flashes */
+.output.stopped .o-time, .output.stopped .o-endtext { color: var(--o-crit); }
+.output.stopped .o-progress i { background: var(--o-crit); }
 .output.flashing { animation: identify .25s steps(2, start) 6; }
 @keyframes bgflash { 0% { background: var(--o-crit); } 100% { background: var(--o-bg); } }
 @keyframes textflash { 0% { opacity: 1; } 100% { opacity: .15; } }
@@ -252,33 +394,93 @@ textarea.json { font-family: var(--font-mono); font-size: 12px; min-height: 180p
 /* full-screen output overlay inside the controller tab */
 #overlay { position: fixed; inset: 0; z-index: 50; display: none; }
 #overlay.on { display: block; }
-#overlay .exit { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2; opacity: .35; transition: opacity .2s; }
-#overlay:hover .exit, #overlay .exit:focus-visible { opacity: 1; }
+#overlay .exit { position: absolute; bottom: max(14px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); z-index: 2; opacity: .9; transition: opacity .2s; min-height: var(--tap); }
+@media (hover: hover) and (pointer: fine) { #overlay .exit { opacity: .35; } #overlay:hover .exit, #overlay .exit:focus-visible { opacity: 1; } }
 body.output-mode #controller { display: none; }
 body.remote-mode #controller, body.remote-mode #overlay { display: none !important; }
+body.output-mode #overlay { display: block; }
+
+/* ---------- phone remote ---------- */
 #remoteView { display: none; min-height: 100%; flex-direction: column; gap: 14px; padding-block: 12px 24px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); max-width: 560px; margin: 0 auto; }
 body.remote-mode { overflow: auto; }
 body.remote-mode #remoteView { display: flex; }
 .r-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .r-head .brand h1 { font-size: 16px; }
-.r-now { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; text-align: center; }
+.r-status { display: flex; align-items: center; gap: 8px; font-size: 13px; min-height: 1.3em; }
+.r-status .dot { background: var(--muted); }
+.r-status.ok .dot { background: var(--ok); }
+.r-status.bad { color: var(--danger-text); } .r-status.bad .dot { background: var(--crit); }
+.r-pin { display: flex; flex-direction: column; gap: 6px; }
+.r-pin .row { gap: 12px; flex-wrap: nowrap; }
+.r-pin label { white-space: nowrap; }
+.r-pin input { width: 7em; min-height: 48px; font-family: var(--font-mono); font-size: 18px; letter-spacing: .3em; text-align: center; }
+.r-pinmsg { font-size: 12px; color: var(--muted); min-height: 1.3em; }
+.r-pinmsg.ok { color: var(--ok); } .r-pinmsg.ok::before { content: "✓ "; }
+.r-pinmsg.bad { color: var(--danger-text); }
+.r-now { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 14px 16px; text-align: center; }
 .r-title { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .r-time { font-family: var(--font-cond); font-weight: 700; font-size: 64px; line-height: 1; font-variant-numeric: tabular-nums; margin: 6px 0; }
-.r-time.warn { color: var(--warn); } .r-time.crit, .r-time.over { color: var(--crit); }
-.r-sub { color: var(--muted); font-size: 13px; min-height: 1.3em; }
+.r-time.warn { color: var(--warn); } .r-time.crit, .r-time.over, .r-time.stopped { color: var(--crit); }
+.r-sub { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--muted); font-size: 13px; min-height: 1.3em; }
+.r-sub .dot { background: var(--st-dot); }
+.r-sub b { font-family: var(--font-cond); letter-spacing: .06em; text-transform: uppercase; color: var(--st-ink); }
 .r-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.r-grid .btn { padding: 18px 10px; font-size: 17px; }
+.r-grid .btn { min-height: 48px; font-size: 16px; }
 .r-grid .span2 { grid-column: span 2; }
-.r-pin { display: flex; align-items: center; gap: 10px; }
-.r-pin input { width: 6em; font-family: var(--font-mono); font-size: 18px; letter-spacing: .3em; text-align: center; }
-.r-conn { color: var(--muted); font-size: 13px; text-align: center; min-height: 1.3em; }
-.r-conn.bad { color: #ffb3b3; }
-.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; margin-bottom: 8px; }
-.seg button { background: var(--panel-2); border: 0; padding: 4px 10px; font-size: 12px; font-weight: 600; color: var(--muted); }
-.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
-.pinbox { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; color: var(--muted); }
-.pinbox b { font-family: var(--font-mono); font-size: 16px; letter-spacing: .2em; color: var(--fg); }
-body.output-mode #overlay { display: block; }
+.r-grid #rPlay { min-height: 72px; font-size: 22px; font-family: var(--font-cond); letter-spacing: .04em; text-transform: uppercase; font-weight: 700; }
+.r-grid #rNext { min-height: 60px; font-size: 20px; font-family: var(--font-cond); letter-spacing: .04em; text-transform: uppercase; font-weight: 700; }
+.r-grid[data-locked] .btn { opacity: .55; }
+.r-lock { font-size: 12px; color: var(--muted); text-align: center; margin-top: -6px; min-height: 1.3em; }
+.r-msg { display: flex; gap: 8px; }
+.r-msg input { min-height: 48px; }
+.r-msg .btn { min-height: 48px; }
+.r-msg[data-locked] { opacity: .55; }
+
+/* ---------- touch and small screens ---------- */
+@media (pointer: coarse) {
+  .btn { min-height: var(--tap); }
+  .btn.small { min-height: 36px; }
+  .seg button { min-height: 36px; }
+  .timer-card .actions .btn { min-height: 32px; min-width: 44px; }
+  input[type="text"], input[type="number"], input[type="time"], input[type="url"], select { min-height: var(--tap); }
+}
+@media (max-width: 820px) {
+  body { overflow: auto; }
+  #controller { height: auto; min-height: 100%; }
+  .main { grid-template-columns: 1fr; }
+  .col { overflow: visible; }
+  .col.right { order: -1; border-bottom: 1px solid var(--line); }
+  .col.left { border-right: 0; }
+  .brand .clock { font-size: 13px; }
+  #btnPopout .txt { display: none; }
+  #btnPopout { width: 44px; height: 40px; padding: 0; }
+  #btnMore { display: inline-flex; width: 44px; height: 40px; padding: 0; font-weight: 700; }
+  .topmenu { display: none; position: absolute; right: 16px; top: calc(100% + 6px); flex-direction: column; align-items: stretch; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); box-shadow: 0 8px 24px rgba(0,0,0,.45); z-index: 30; }
+  .topbar.open .topmenu { display: flex; }
+  .topmenu .divider { display: none; }
+  .topmenu .btn { justify-content: flex-start; background: transparent; border-color: transparent; min-height: var(--tap); }
+  .topmenu .btn.help { width: auto; height: auto; border-radius: var(--radius); }
+  .topmenu .btn.help::after { content: "Help"; font-weight: 600; margin-left: 4px; }
+  .firstrun { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .transport { grid-template-columns: 1fr 1fr; }
+  .transport #btnPlay { grid-column: span 2; min-height: 64px; font-size: 22px; }
+  .transport .btn.big { min-height: 56px; }
+  .nudgerow { display: block; }
+  .nudgerow .spacer { display: none; }
+  .nudge { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .extras { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 6px; }
+  .nudge .btn, .extras .btn { min-height: var(--tap); padding: 0 4px; font-size: 13px; }
+  .timer-card .body { flex-direction: column; align-items: flex-start; gap: 0; }
+  .timer-card .sub { max-width: 100%; }
+  .timer-card .right { flex: none; }
+  .timer-card .actions .btn.icon.edit { display: none; }
+  .timer-card { cursor: default; }
+  .grid3, .grid2, .appearance, .checks { grid-template-columns: 1fr; }
+  .thresholds .grid { grid-template-columns: 1fr; }
+  .shortcuts { grid-template-columns: auto 1fr; }
+  dialog { width: 100vw; max-width: 100vw; height: 100%; max-height: 100vh; border-radius: 0; border: 0; margin: 0; }
+}
+@media (max-width: 480px) { .nudge { grid-template-columns: repeat(3, 1fr); } }
 </style>
 </head>
 <body>
@@ -291,181 +493,204 @@ body.output-mode #overlay { display: block; }
       <span class="clock" id="topClock">00:00:00</span>
     </div>
     <div class="spacer"></div>
-    <button class="btn" id="btnPopout" title="Open the speaker display in its own window (drag it to the projector or second screen)">Open display window</button>
-    <button class="btn" id="btnOverlay" title="Show the speaker display full-screen in this tab">Full-screen here <kbd>F</kbd></button>
-    <button class="btn" id="btnSettings">Appearance</button>
-    <button class="btn" id="btnExport">Export</button>
-    <button class="btn" id="btnImport">Import</button>
+    <button class="btn primary" id="btnPopout" title="Open the speaker display in its own window (drag it to the projector or second screen)" aria-label="Open display window"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span class="txt">Open display window</span></button>
+    <div class="topmenu" id="topMenu">
+      <button class="btn" id="btnOverlay" title="Show the speaker display full-screen in this tab">Full-screen here</button>
+      <span class="divider"></span>
+      <button class="btn quiet" id="btnSettings">Appearance</button>
+      <button class="btn quiet" id="btnExport">Export</button>
+      <button class="btn quiet" id="btnImport">Import</button>
+      <button class="btn help" id="btnHelp" aria-label="Help and shortcuts" title="Help and shortcuts">?</button>
+    </div>
+    <button class="btn" id="btnMore" aria-label="More" aria-expanded="false">⋯</button>
   </header>
+  <div class="firstrun" id="firstRun" hidden>
+    <span class="eyebrow">First run</span>
+    <span class="step"><b class="n">1</b><span>A sample rundown is loaded. Replace it with <b>+ Add timer</b> or <b>Import</b>.</span></span>
+    <span class="step"><b class="n">2</b><span><b>Open display window</b> and drag it to the projector or second screen.</span></span>
+    <span class="step"><b class="n">3</b><span>Press <b>Start</b> to run the clock and <b>Next</b> for the next timer. A phone can take over from <b>Remote displays</b>.</span></span>
+    <span class="spacer"></span>
+    <button class="btn small" id="firstRunDismiss">Got it</button>
+  </div>
 
   <div class="main">
     <section class="col left" aria-label="Rundown">
       <div class="section-head">
         <h2>Rundown</h2>
         <div class="row">
-          <button class="btn small" id="btnResetAll" title="Mark every timer as not done">Reset all</button>
           <button class="btn primary" id="btnAdd">+ Add timer</button>
         </div>
       </div>
       <ul id="rundown"></ul>
-      <div class="total" id="total"></div>
-      <div class="panel">
-        <h3>Keyboard shortcuts</h3>
-        <div class="shortcuts">
-          <kbd>Space</kbd><span>Start / pause</span>
-          <kbd>R</kbd><span>Reset current timer</span>
-          <kbd>N</kbd> <span>Next timer</span>
-          <kbd>P</kbd> <span>Previous timer</span>
-          <kbd>↑ / ↓</kbd><span>Add / remove 1 minute</span>
-          <kbd>Shift ↑ / ↓</kbd><span>Add / remove 10 seconds</span>
-          <kbd>F</kbd><span>Full-screen display in this tab (Esc to leave)</span>
-          <kbd>B</kbd><span>Blackout</span>
-          <kbd>X</kbd><span>Flash the display</span>
-          <kbd>M</kbd><span>Jump to the message box</span>
-        </div>
-      </div>
+      <div class="total" id="total"><span id="totalText"></span><button class="btn small quiet danger" id="btnResetAll" title="Mark every timer as not done">Reset all…</button></div>
     </section>
 
     <section class="col right" aria-label="Now playing">
       <div class="section-head">
         <h2>Now playing</h2>
-        <span class="hint" id="statusLine"></span>
+        <span class="hint" id="nowIndex"></span>
       </div>
-      <div class="preview-wrap"><div class="output" id="preview"></div></div>
+      <div class="status" id="statusLine" data-state="ready"><i class="dot"></i><b id="statusLabel"></b><span class="detail" id="statusDetail"></span></div>
+      <div class="preview-wrap" id="previewWrap" data-state="ready"><div class="output" id="preview"></div></div>
 
       <div class="transport">
         <button class="btn big primary" id="btnPlay">Start</button>
         <button class="btn big" id="btnReset">Reset</button>
         <button class="btn big" id="btnNext">Next ▸</button>
       </div>
-      <div class="nudge">
-        <button class="btn" data-nudge="-60">−1 min</button>
-        <button class="btn" data-nudge="-10">−10 s</button>
-        <button class="btn" data-nudge="10">+10 s</button>
-        <button class="btn" data-nudge="60">+1 min</button>
-        <button class="btn" data-nudge="300">+5 min</button>
-        <span class="spacer" style="flex:1"></span>
-        <button class="btn" id="btnPrev">◂ Prev</button>
-        <button class="btn toggle" id="btnBlackout" aria-pressed="false">Blackout <kbd>B</kbd></button>
-        <button class="btn" id="btnFlash">Flash <kbd>X</kbd></button>
+      <div class="nudgerow">
+        <div class="nudge">
+          <button class="btn" data-nudge="-60">−1 min</button>
+          <button class="btn" data-nudge="-10">−10 s</button>
+          <button class="btn" data-nudge="10">+10 s</button>
+          <button class="btn" data-nudge="60">+1 min</button>
+          <button class="btn" data-nudge="300">+5 min</button>
+        </div>
+        <span class="spacer"></span>
+        <div class="extras">
+          <button class="btn" id="btnPrev">◂ Prev</button>
+          <button class="btn toggle" id="btnBlackout" aria-pressed="false">Blackout</button>
+          <button class="btn" id="btnFlash">Flash</button>
+        </div>
       </div>
 
       <div class="panel">
-        <h3>Message to speaker</h3>
+        <div class="head"><h3>Message to speaker</h3><span class="chip" id="msgState">Presets fill the box, Show sends it</span></div>
+        <div class="presets" id="msgPresets"></div>
         <div class="row">
-          <input type="text" id="msgText" placeholder="e.g. Please wrap up, Q&amp;A starts next" style="flex:1 1 200px">
-          <div class="msg-colors" role="group" aria-label="Message color">
-            <button class="btn" data-c="white" aria-pressed="true" title="White"></button>
-            <button class="btn" data-c="green" aria-pressed="false" title="Green"></button>
-            <button class="btn" data-c="red" aria-pressed="false" title="Red"></button>
+          <input type="text" id="msgText" placeholder="Type a message…" style="flex:1 1 200px" maxlength="200">
+          <div class="msg-colors seg" role="group" aria-label="Message colour">
+            <button class="btn" data-c="white" aria-pressed="true"><i class="dot white"></i>White</button>
+            <button class="btn" data-c="green" aria-pressed="false"><i class="dot green"></i>Green</button>
+            <button class="btn" data-c="red" aria-pressed="false"><i class="dot red"></i>Red</button>
           </div>
         </div>
         <div class="row" style="margin-top:8px">
           <label class="check"><input type="checkbox" id="msgBold"> Bold</label>
           <label class="check"><input type="checkbox" id="msgUpper"> Uppercase</label>
           <label class="check"><input type="checkbox" id="msgFlash"> Flashing</label>
-          <span class="spacer" style="flex:1"></span>
+          <span class="spacer"></span>
           <button class="btn primary" id="btnMsgShow">Show</button>
           <button class="btn" id="btnMsgHide">Hide</button>
         </div>
       </div>
 
-      <div class="panel" id="remotePanel">
-        <div class="row" style="margin-bottom:6px"><h3 style="margin:0">Remote displays &amp; remote control</h3><span class="pinbox" title="Phones need this PIN to control the timer. Watching needs no PIN.">Control PIN <b id="pinValue"></b><button class="btn small" id="pinNew">New PIN</button></span></div>
-        <p class="hint" style="margin:0 0 10px">Every link below can open as a <b>display</b> (just watches) or as a <b>remote control</b> (a phone page with Start, Next, +1 min and the rest; needs the PIN).</p>
-        <div class="eyebrow" style="margin-bottom:6px">On the venue Wi-Fi · desktop app</div>
-        <div id="lanRemote" hidden>
-          <p class="hint" style="margin:0 0 10px">Any phone, tablet or laptop on this Wi-Fi can show the speaker display. Scan the code or open the link. No internet needed.</p>
-          <div class="seg" data-seg="lan"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
-          <div class="row" style="align-items:flex-start">
-            <div class="qr" id="lanQr" aria-label="QR code for the link"></div>
-            <div class="field" style="flex:1 1 220px">
-              <label for="lanUrl">Link</label>
-              <input type="text" id="lanUrl" readonly>
-              <div class="row"><button class="btn small" id="lanCopy">Copy link</button><span class="hint" id="lanClients">No displays connected</span></div>
-              <select id="lanAddr" aria-label="Network address" hidden></select>
-            </div>
-          </div>
-        </div>
-        <p class="hint" id="lanUnavailable" style="margin:0">Remote displays over the venue Wi-Fi need the desktop app (Windows, macOS or Linux download). In the browser, use "Open display window" on this computer.</p>
-
-        <div class="eyebrow" style="margin:16px 0 6px">Anywhere · room code</div>
-        <p class="hint" style="margin:0 0 8px">Needs internet on both ends. The display opens the link or enters the code at the Stage Clock website. Devices connect to each other directly; the public PeerJS service only introduces them.</p>
-        <div class="row" id="roomOff"><button class="btn" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
-        <div id="roomOn" hidden>
-          <div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
-          <div class="row" style="align-items:flex-start">
-            <div class="qr" id="roomQr" aria-label="QR code for the room link"></div>
-            <div class="field" style="flex:1 1 220px">
-              <label>Room code</label>
-              <div class="roomcode" id="roomCode"></div>
-              <label for="roomUrl">Link</label>
-              <input type="text" id="roomUrl" readonly>
-              <div class="row"><button class="btn small" id="roomCopy">Copy link</button><span class="hint" id="roomClients">No displays connected</span><button class="btn small danger" id="roomStop">Stop room</button></div>
-            </div>
-          </div>
+      <details class="panel" id="remotePanel">
+        <summary>
+          <span class="chev" aria-hidden="true"></span>
+          <h3>Remote displays &amp; phone remote</h3>
+          <span class="hint" id="remoteCodeSummary"></span>
+          <span class="hint clients" id="remoteCount">Nothing connected</span>
+          <span class="spacer"></span>
+          <span class="pinbox" title="Phones need this PIN to control the timer. Watching needs no PIN.">Control PIN <b id="pinValue"></b><button class="btn small" id="pinNew">New PIN</button></span>
+        </summary>
+        <div class="seg tabs" data-seg="transport" role="tablist">
+          <button data-transport="lan" aria-pressed="false">Venue Wi-Fi</button>
+          <button data-transport="room" aria-pressed="true">Room code</button>
+          <button data-transport="relay" aria-pressed="false">Your own relay</button>
         </div>
 
-        <div class="eyebrow" style="margin:16px 0 6px">Anywhere · your own relay</div>
-        <p class="hint" style="margin:0 0 8px">Same idea as a room code, but through a relay server you run (see <code>relay/</code> in the repository: a free Cloudflare Worker). No third-party service involved.</p>
-        <div class="row">
-          <input type="text" id="relayUrl" placeholder="https://stage-clock-relay.example.workers.dev" style="flex:1 1 240px" aria-label="Relay URL">
-          <button class="btn" id="relayStart">Start relay room</button>
-        </div>
-        <span class="hint" id="relayError"></span>
-        <div id="relayOn" hidden>
-          <div class="seg" data-seg="relay" style="margin-top:8px"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div>
-          <div class="row" style="align-items:flex-start">
-            <div class="qr" id="relayQr" aria-label="QR code for the relay link"></div>
-            <div class="field" style="flex:1 1 220px">
-              <label>Room code</label>
-              <div class="roomcode" id="relayCode"></div>
-              <label for="relayLink">Link</label>
-              <input type="text" id="relayLink" readonly>
-              <div class="row"><button class="btn small" id="relayCopy">Copy link</button><span class="hint" id="relayClients">No displays connected</span><button class="btn small danger" id="relayStop">Stop</button></div>
+        <section data-transport="lan" hidden>
+          <div id="lanRemote" hidden>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="lan"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="lanKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="align-items:flex-start">
+              <div class="qr" id="lanQr" aria-label="QR code for the link"></div>
+              <div class="field" style="flex:1 1 220px">
+                <label for="lanUrl">Link</label>
+                <div class="row" style="flex-wrap:nowrap"><input type="text" id="lanUrl" readonly><button class="btn small" id="lanCopy">Copy link</button></div>
+                <select id="lanAddr" aria-label="Network address" hidden></select>
+                <div class="row"><span class="hint clients" id="lanClients">No displays connected</span></div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+          <div class="notice" id="lanUnavailable">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8b96a3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            <div style="flex:1"><b>Wi-Fi displays need the desktop app</b><span class="hint">It runs a small server on this computer so phones and tablets on the same network can open the display without internet. In the browser, use Open display window or a room code.</span></div>
+            <a class="btn" href="https://github.com/David-Uka/stage-clock/releases/latest" target="_blank" rel="noopener">Download</a>
+          </div>
+          <details class="help"><summary><b>How this works</b><span>· same Wi-Fi, no internet needed</span></summary><p>The desktop app serves the display on this computer's network address. Any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi scans the code or opens the link. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.</p></details>
+        </section>
+
+        <section data-transport="room">
+          <div class="row" id="roomOff"><button class="btn primary" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
+          <div id="roomOn" hidden>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="roomKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="align-items:flex-start">
+              <div class="qr" id="roomQr" aria-label="QR code for the room link"></div>
+              <div class="field" style="flex:1 1 220px">
+                <div class="row" style="align-items:baseline"><span class="label">Room code</span><div class="roomcode" id="roomCode"></div></div>
+                <label for="roomUrl">Link</label>
+                <div class="row" style="flex-wrap:nowrap"><input type="text" id="roomUrl" readonly><button class="btn small" id="roomCopy">Copy link</button></div>
+                <div class="row"><span class="hint clients" id="roomClients">No displays connected</span><span class="spacer"></span><button class="btn small danger" id="roomStop">Stop room</button></div>
+              </div>
+            </div>
+          </div>
+          <details class="help"><summary><b>How this works</b><span>· needs internet on both ends · devices connect directly, PeerJS only introduces them</span></summary><p>The display opens the link, scans the code, or enters the six-character code at the Stage Clock website. The two devices then talk to each other directly over WebRTC. The public PeerJS service only introduces them and never sees the timer data.</p></details>
+        </section>
+
+        <section data-transport="relay" hidden>
+          <div class="row" style="flex-wrap:nowrap">
+            <input type="text" id="relayUrl" placeholder="https://stage-clock-relay.example.workers.dev" aria-label="Relay URL">
+            <button class="btn primary" id="relayStart">Start relay room</button>
+          </div>
+          <span class="hint" id="relayError"></span>
+          <div id="relayOn" hidden>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="relay"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="relayKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="align-items:flex-start">
+              <div class="qr" id="relayQr" aria-label="QR code for the relay link"></div>
+              <div class="field" style="flex:1 1 220px">
+                <div class="row" style="align-items:baseline"><span class="label">Room code</span><div class="roomcode" id="relayCode"></div></div>
+                <label for="relayLink">Link</label>
+                <div class="row" style="flex-wrap:nowrap"><input type="text" id="relayLink" readonly><button class="btn small" id="relayCopy">Copy link</button></div>
+                <div class="row"><span class="hint clients" id="relayClients">No displays connected</span><span class="spacer"></span><button class="btn small danger" id="relayStop">Stop</button></div>
+              </div>
+            </div>
+          </div>
+          <details class="help"><summary><b>How this works</b><span>· a relay server you run · no third party</span></summary><p>Same idea as a room code, but through a relay server you run: a free Cloudflare Worker from <code>relay/</code> in the repository. No third-party service sees the connection. Displays open the link or scan the code exactly like a room code.</p></details>
+        </section>
+      </details>
     </section>
   </div>
 </div>
 
-<div id="overlay"><div class="output" id="bigOutput"></div><button class="btn exit" id="btnExitOverlay">Exit (Esc)</button></div>
+<div id="overlay"><div class="output" id="bigOutput"></div><button class="btn exit" id="btnExitOverlay">Exit full screen</button></div>
 
 <div id="remoteView">
   <header class="r-head">
     <div class="brand"><svg class="mark" viewBox="0 0 120 120" width="22" height="22" aria-hidden="true"><circle cx="60" cy="60" r="44" fill="none" stroke="#2a323b" stroke-width="12"/><circle cx="60" cy="60" r="44" fill="none" stroke="#ff2d2d" stroke-width="12" stroke-linecap="round" stroke-dasharray="193.4 276.5" transform="rotate(-90 60 60)"/><path d="M60 32v28l18 14" fill="none" stroke="#fff" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/></svg><h1>STAGE <span class="red">CLOCK</span> · Remote</h1></div>
-    <span class="hint" id="rClock"></span>
+    <span class="hint mono" id="rClock"></span>
   </header>
-  <div class="r-now">
+  <div class="r-status" id="rConn"><i class="dot"></i><span id="rConnText">Connecting…</span></div>
+  <div class="r-pin">
+    <div class="row">
+      <label for="rPin" class="label">Control PIN</label>
+      <input type="text" id="rPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····">
+    </div>
+    <div class="r-pinmsg" id="rPinMsg">Enter the 4-digit PIN from the controller to take control. Watching needs no PIN.</div>
+  </div>
+  <div class="r-now" data-state="ready">
     <div class="r-title" id="rTitle">Waiting for the controller…</div>
     <div class="r-time" id="rTime">--:--</div>
-    <div class="r-sub" id="rSub"></div>
+    <div class="r-sub" id="rSub"><i class="dot"></i><b id="rState"></b><span id="rSpeaker"></span></div>
   </div>
-  <div class="r-pin">
-    <label for="rPin">Control PIN</label>
-    <input type="text" id="rPin" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="····">
-    <span class="hint" id="rPinMsg">Shown on the controller</span>
-  </div>
-  <div class="r-grid">
+  <div class="r-grid" id="rGrid">
     <button class="btn primary span2" data-cmd="play" id="rPlay">Start</button>
+    <button class="btn span2" data-cmd="next" id="rNext">Next ▸</button>
     <button class="btn" data-cmd="prev">◂ Prev</button>
-    <button class="btn" data-cmd="next">Next ▸</button>
+    <button class="btn" data-cmd="reset">Reset</button>
     <button class="btn" data-cmd="nudge" data-value="-60">−1 min</button>
     <button class="btn" data-cmd="nudge" data-value="60">+1 min</button>
     <button class="btn" data-cmd="nudge" data-value="-10">−10 s</button>
     <button class="btn" data-cmd="nudge" data-value="10">+10 s</button>
-    <button class="btn" data-cmd="reset">Reset</button>
-    <button class="btn toggle" data-cmd="blackout" id="rBlackout" aria-pressed="false">Blackout</button>
+    <button class="btn toggle span2" data-cmd="blackout" id="rBlackout" aria-pressed="false">Blackout</button>
     <button class="btn span2" data-cmd="flash">Flash the display</button>
   </div>
-  <div class="row">
+  <div class="r-lock" id="rLock"></div>
+  <div class="r-msg" id="rMsg">
     <input type="text" id="rMsgText" placeholder="Message to speaker" style="flex:1 1 160px" maxlength="200">
     <button class="btn primary" data-cmd="message">Show</button>
     <button class="btn" data-cmd="hideMessage">Hide</button>
   </div>
-  <div class="r-conn" id="rConn"></div>
 </div>
 
 <dialog id="timerDialog">
@@ -481,28 +706,37 @@ body.output-mode #overlay { display: block; }
           <div><input type="number" id="tS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div>
         </div>
       </div>
-      <div class="field"><label for="tMode">Display</label>
-        <select id="tMode"><option value="down">Count down to zero</option><option value="up">Count up from zero</option></select>
+      <div class="field"><label>Display</label>
+        <div class="seg fill" data-seg="tMode"><button type="button" data-value="down" aria-pressed="true">Count down to 0</button><button type="button" data-value="up" aria-pressed="false">Count up from 0</button></div>
+        <select id="tMode" hidden><option value="down">Count down to zero</option><option value="up">Count up from zero</option></select>
       </div>
     </div>
-    <div class="grid2">
-      <div class="field"><label>Turn yellow with this much left</label>
-        <div class="hms" style="grid-template-columns:1fr 1fr"><div><input type="number" id="tWarnM" min="0" value="5" inputmode="numeric"><span>min</span></div><div><input type="number" id="tWarnS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div>
+    <div class="thresholds">
+      <div class="grid">
+        <label><i class="sw" style="background:var(--warn)"></i>Turn yellow with</label>
+        <div class="row"><div class="seg" data-seg="tWarn"><button type="button" data-value="300">5 min left</button><button type="button" data-value="120">2 min</button><button type="button" data-value="60">1 min</button><button type="button" data-value="custom">Custom…</button></div>
+          <div class="hms custom" id="tWarnCustom" hidden><div><input type="number" id="tWarnM" min="0" value="5" inputmode="numeric"><span>min</span></div><div><input type="number" id="tWarnS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div></div>
+        <label><i class="sw" style="background:var(--crit)"></i>Turn red with</label>
+        <div class="row"><div class="seg" data-seg="tCrit"><button type="button" data-value="60">1 min left</button><button type="button" data-value="30">30 s</button><button type="button" data-value="custom">Custom…</button></div>
+          <div class="hms custom" id="tCritCustom" hidden><div><input type="number" id="tCritM" min="0" value="1" inputmode="numeric"><span>min</span></div><div><input type="number" id="tCritS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div></div>
       </div>
-      <div class="field"><label>Turn red with this much left</label>
-        <div class="hms" style="grid-template-columns:1fr 1fr"><div><input type="number" id="tCritM" min="0" value="1" inputmode="numeric"><span>min</span></div><div><input type="number" id="tCritS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div>
-      </div>
+      <div id="tBar"></div>
+      <div class="barlabels" id="tBarLabels"></div>
+      <span class="hint bad" id="tValidation" hidden></span>
     </div>
     <div class="grid2">
-      <div class="field"><label for="tZero">When time runs out</label>
-        <select id="tZero"><option value="continue">Keep counting overtime (+0:12)</option><option value="stop">Stop at zero</option></select>
+      <div class="field"><label>When time runs out</label>
+        <div class="seg fill" data-seg="tZero"><button type="button" data-value="continue" aria-pressed="true">Keep counting (+0:12)</button><button type="button" data-value="stop" aria-pressed="false">Stop at zero</button></div>
+        <select id="tZero" hidden><option value="continue">Keep counting overtime (+0:12)</option><option value="stop">Stop at zero</option></select>
       </div>
-      <div class="field"><label for="tTrigger">Start</label>
-        <select id="tTrigger"><option value="manual">Manually</option><option value="linked">When the previous timer ends</option><option value="scheduled">At a time of day</option></select>
-        <input type="time" id="tStartAt" aria-label="Start time" hidden>
+      <div class="field"><label>Start</label>
+        <div class="seg fill" data-seg="tTrigger"><button type="button" data-value="manual" aria-pressed="true">Manually</button><button type="button" data-value="linked" aria-pressed="false">After previous</button><button type="button" data-value="scheduled" aria-pressed="false">At a time</button></div>
+        <select id="tTrigger" hidden><option value="manual">Manually</option><option value="linked">When the previous timer ends</option><option value="scheduled">At a time of day</option></select>
+        <div class="row" style="flex-wrap:nowrap"><input type="time" id="tStartAt" aria-label="Start time" style="width:8em" disabled><span class="hint">Used when “At a time” is chosen</span></div>
       </div>
     </div>
     <div class="foot">
+      <button type="button" class="btn small danger left" id="tDelete" hidden>Delete timer</button>
       <button type="button" class="btn" id="tCancel">Cancel</button>
       <button type="submit" class="btn primary" id="tSave">Save</button>
     </div>
@@ -510,20 +744,21 @@ body.output-mode #overlay { display: block; }
 </dialog>
 
 <dialog id="settingsDialog">
-  <h2>Appearance</h2>
-  <p class="hint" style="margin:0 0 12px">Changes apply to the display immediately. Alerts are silent: there is no sound at any point.</p>
-  <div class="form">
-    <div class="grid3">
-      <div class="field"><label for="sBg">Background</label><input type="color" id="sBg"></div>
-      <div class="field"><label for="sFg">Digits</label><input type="color" id="sFg"></div>
-      <div class="field"><label for="sDim">Secondary text</label><input type="color" id="sDim"></div>
-      <div class="field"><label for="sWarn">Wrap-up (yellow)</label><input type="color" id="sWarn"></div>
-      <div class="field"><label for="sCrit">Final / time over (red)</label><input type="color" id="sCrit"></div>
-      <div class="field"><label for="sFont">Digit font</label>
-        <select id="sFont"><option value="condensed">Condensed</option><option value="mono">Monospace</option><option value="system">System</option></select>
+  <div class="dhead"><h2>Appearance</h2><span class="hint">Changes apply to the display immediately. Alerts are silent.</span></div>
+  <div class="appearance">
+    <div class="form">
+      <div class="swatches">
+        <span class="label">Colours</span>
+        <label class="swatch"><i class="chipc" data-for="sBg"></i>Background<code class="hex" data-for="sBg"></code><input type="color" id="sBg"></label>
+        <label class="swatch"><i class="chipc" data-for="sFg"></i>Digits<code class="hex" data-for="sFg"></code><input type="color" id="sFg"></label>
+        <label class="swatch"><i class="chipc" data-for="sDim"></i>Secondary text<code class="hex" data-for="sDim"></code><input type="color" id="sDim"></label>
+        <label class="swatch"><i class="chipc" data-for="sWarn"></i>Wrap-up (yellow)<code class="hex" data-for="sWarn"></code><input type="color" id="sWarn"></label>
+        <label class="swatch"><i class="chipc" data-for="sCrit"></i>Final / time over (red)<code class="hex" data-for="sCrit"></code><input type="color" id="sCrit"></label>
       </div>
-    </div>
-    <div class="grid2">
+      <div class="field"><label>Digit font</label>
+        <div class="seg fill" data-seg="sFontSeg"><button type="button" data-value="condensed">Condensed</button><button type="button" data-value="mono">Monospace</button><button type="button" data-value="system">System</button></div>
+        <select id="sFont" hidden><option value="condensed">Condensed</option><option value="mono">Monospace</option><option value="system">System</option></select>
+      </div>
       <div class="field"><label for="sEnd">Alert when time is over</label>
         <select id="sEnd">
           <option value="flash">Flash whole screen red</option>
@@ -534,19 +769,23 @@ body.output-mode #overlay { display: block; }
       </div>
       <div class="field"><label for="sEndText">Text shown when time is over</label><input type="text" id="sEndText" placeholder="TIME'S UP"></div>
     </div>
-    <div class="grid3">
-      <label class="check"><input type="checkbox" id="sShowTitle"> Show title</label>
-      <label class="check"><input type="checkbox" id="sShowSpeaker"> Show speaker</label>
-      <label class="check"><input type="checkbox" id="sShowClock"> Show time of day</label>
-      <label class="check"><input type="checkbox" id="sShowNext"> Show "next up"</label>
-      <label class="check"><input type="checkbox" id="sShowProgress"> Show progress bar</label>
-      <label class="check"><input type="checkbox" id="sClock24"> 24-hour clock</label>
-      <label class="check"><input type="checkbox" id="sHideHours"> Hide hours when zero</label>
+    <div>
+      <div class="previewhead"><span class="label">Live preview</span><div class="seg" data-seg="previewPhase"><button type="button" data-value="normal" aria-pressed="true">Normal</button><button type="button" data-value="warn">Wrap-up</button><button type="button" data-value="crit">Final</button><button type="button" data-value="over">Over</button></div></div>
+      <div class="preview-wrap plain"><div class="output" id="sPreview"></div></div>
+      <div class="checks">
+        <label class="check"><input type="checkbox" id="sShowTitle"> Show title</label>
+        <label class="check"><input type="checkbox" id="sShowSpeaker"> Show speaker</label>
+        <label class="check"><input type="checkbox" id="sShowClock"> Show time of day</label>
+        <label class="check"><input type="checkbox" id="sShowNext"> Show “next up”</label>
+        <label class="check"><input type="checkbox" id="sShowProgress"> Show progress bar</label>
+        <label class="check"><input type="checkbox" id="sClock24"> 24-hour clock</label>
+        <label class="check"><input type="checkbox" id="sHideHours"> Hide hours when zero</label>
+      </div>
     </div>
-    <div class="foot">
-      <button type="button" class="btn" id="sDefaults">Restore defaults</button>
-      <button type="button" class="btn primary" id="sClose">Done</button>
-    </div>
+  </div>
+  <div class="foot">
+    <button type="button" class="btn" id="sDefaults">Restore defaults</button>
+    <button type="button" class="btn primary" id="sClose">Done</button>
   </div>
 </dialog>
 
@@ -567,7 +806,42 @@ body.output-mode #overlay { display: block; }
   </div>
 </dialog>
 
+<dialog id="helpDialog">
+  <h2>Help</h2>
+  <div class="form">
+    <div class="field">
+      <span class="label">Getting started</span>
+      <ol class="steps">
+        <li>Build the rundown with <b>+ Add timer</b>, or <b>Import</b> a saved one.</li>
+        <li><b>Open display window</b> and drag it to the projector or second screen. Phones and other screens connect from <b>Remote displays</b>.</li>
+        <li>Press <b>Start</b> to run the clock and <b>Next</b> for the next timer. Every alert is visual; nothing makes a sound.</li>
+      </ol>
+    </div>
+    <div class="field">
+      <span class="label">Keyboard shortcuts</span>
+      <div class="shortcuts">
+        <kbd>Space</kbd><span>Start / pause</span>
+        <kbd>↑ / ↓</kbd><span>± 1 minute</span>
+        <kbd>N</kbd><span>Next timer</span>
+        <kbd>Shift ↑ / ↓</kbd><span>± 10 seconds</span>
+        <kbd>P</kbd><span>Previous timer</span>
+        <kbd>B</kbd><span>Blackout</span>
+        <kbd>R</kbd><span>Reset current timer</span>
+        <kbd>X</kbd><span>Flash the display</span>
+        <kbd>F</kbd><span>Full-screen (Esc leaves)</span>
+        <kbd>M</kbd><span>Message box</span>
+        <kbd>?</kbd><span>This help</span>
+      </div>
+    </div>
+  </div>
+  <div class="foot">
+    <a class="hint left" href="https://david-uka.github.io/stage-clock/site/" target="_blank" rel="noopener" style="font-weight:600;color:var(--accent);text-decoration:none">Website and downloads</a>
+    <button type="button" class="btn primary" id="helpClose">Done</button>
+  </div>
+</dialog>
+
 <script src="vendor/qrcode.js"></script>
+
 <script>
 (() => {
 'use strict';
@@ -584,6 +858,7 @@ const DEFAULT_SETTINGS = {
   showTitle: true, showSpeaker: true, showClock: true, showNext: true, showProgress: true,
   clock24: true, hideHours: true,
   relayUrl: '',
+  presets: ['Please wrap up', '5 minutes left', 'Q&A is next'],
 };
 const SAMPLE_TIMERS = [
   { id: uid(), title: 'Welcome & housekeeping', speaker: 'Host', duration: 5 * 60, warnAt: 60, critAt: 30, mode: 'down', atZero: 'continue', trigger: 'manual', startAt: '', done: false },
@@ -606,6 +881,10 @@ function loadState() {
     if (raw) {
       const s = JSON.parse(raw); s.settings = { ...DEFAULT_SETTINGS, ...(s.settings || {}) };
       if (!/^\d{4}$/.test(s.pin || '')) s.pin = newPin();
+      if (typeof s.started !== 'boolean') {   // 1.3 saves: derive once, so a nudge before Start cannot flip Ready into Paused
+        const t = (s.timers || []).find(x => x.id === s.activeId);
+        s.started = !!s.running || (!!t && s.remainingMs < t.duration * 1000);
+      }
       s.timers.forEach((t, i) => {
         if (!t.trigger) t.trigger = 'manual';
         if (t.startAt === undefined) t.startAt = '';
@@ -651,7 +930,7 @@ function fmtTod(d, h24) {
 
 /* ---------- OUTPUT RENDERER (shared by preview, overlay and the pop-out window) ---------- */
 const OUTPUT_HTML = `
-  <div class="o-top"><div class="o-title"></div><div class="o-clock"></div></div>
+  <div class="o-top"><div class="o-title"></div><div class="o-paused" aria-label="Paused"><i></i><i></i>PAUSED</div><div class="o-clock"></div></div>
   <div class="o-mid"><div class="o-time">00:00</div><div class="o-endtext"></div></div>
   <div class="o-bottom"><div class="o-speaker"></div><div class="o-next"></div></div>
   <div class="o-progress"><i></i></div>
@@ -670,18 +949,45 @@ function mountOutput(root) {
 }
 function describe(s, now) {
   const st = s.settings, t = activeTimer(s);
-  if (!t) return { t: null, phase: 'normal', text: '--:--', endText: '', frac: 0, rem: 0 };
+  if (!t) return { t: null, phase: 'normal', text: '--:--', endText: '', frac: 0, rem: 0, durMs: 0, paused: false, waiting: false };
   const rem = remainingMs(s, now), durMs = t.duration * 1000;
   let phase = 'normal', text, endText = '';
-  if (rem <= 0) phase = 'over'; else if (rem <= t.critAt * 1000) phase = 'crit'; else if (rem <= t.warnAt * 1000) phase = 'warn';
+  // "stopped" is a stop-at-zero timer that reached zero: red, still, never flashing. "over" counts up and alerts.
+  if (rem <= 0) phase = t.atZero === 'stop' ? 'stopped' : 'over'; else if (rem <= t.critAt * 1000) phase = 'crit'; else if (rem <= t.warnAt * 1000) phase = 'warn';
   if (t.mode === 'up') text = fmtClock(durMs - rem, st.hideHours, Math.floor);
   else if (rem <= 0 && t.atZero === 'continue') text = '+' + fmtClock(-rem, st.hideHours);
   else text = fmtClock(Math.max(0, rem), st.hideHours);
-  if (phase === 'over') endText = st.endText || '';
-  else if (!s.running && t.trigger === 'scheduled' && !t.done && todayAt(t.startAt, now) > now) endText = `Starts at ${t.startAt}`;
+  const waiting = !s.running && t.trigger === 'scheduled' && !t.done && todayAt(t.startAt, now) > now;
+  if (rem <= 0) endText = st.endText || '';
+  else if (waiting) endText = `Starts at ${t.startAt}`;
+  const started = typeof s.started === 'boolean' ? s.started : rem < durMs;   // older saves have no flag
+  const paused = !s.running && !waiting && !s.preview && rem > 0 && started;
   const frac = durMs > 0 ? Math.min(1, Math.max(0, rem / durMs)) : 0;
-  return { t, phase, text, endText, frac, rem };
+  return { t, phase, text, endText, frac, rem, durMs, paused, waiting, started };
 }
+/* The state of the show, in one place, shared by the controller and the phone remote:
+   running / paused / over / finished / scheduled / ready. */
+const STATE_LABEL = { running: 'Running', paused: 'Paused', over: 'Over time', finished: 'Finished', ready: 'Ready', scheduled: 'Starts at' };
+function hhmm(ms, clock24) { return fmtTod(new Date(ms), clock24).replace(/:\d\d( [AP]M)?$/, '$1'); }
+function showState(s, now) {
+  const t = activeTimer(s); if (!t) return { state: 'ready', label: 'No timer', detail: '', d: null, play: 'Start' };
+  const d = describe(s, now), rem = d.rem, durMs = t.duration * 1000, planned = fmtDur(t.duration);
+  const r = (state, label, detail) => ({ state, label, detail, d, play: s.running ? 'Pause' : state === 'paused' || state === 'over' ? 'Resume' : 'Start' });
+  if (d.waiting) { const at = todayAt(t.startAt, now); return r('scheduled', `Starts at ${t.startAt}`, `in ${fmtClock(at - now, true)} · ${t.title}`); }
+  if (s.running) {
+    if (rem <= 0) return r('over', 'Over time', `+${fmtClock(-rem, true)} over · planned ${planned}`);
+    return r('running', 'Running', `${fmtClock(rem, true)} left · ends ${hhmm(now + rem, s.settings.clock24)}`);
+  }
+  if (rem <= 0) {
+    if (t.atZero === 'stop') return r('finished', 'Finished', `planned ${planned}`);
+    return r('over', 'Over time', `+${fmtClock(-rem, true)} over · paused`);
+  }
+  if (!d.started) return r('ready', 'Ready', `${planned} planned`);
+  return r('paused', 'Paused', `paused at ${fmtClock(rem, true)} · ${fmtClock(durMs - rem, true)} elapsed`);
+}
+/* Write to the DOM only when something changed: tick() runs every animation frame. */
+function setText(el, v) { if (el && el.textContent !== v) el.textContent = v; }
+function setData(el, k, v) { if (!el) return; if (v == null) { if (k in el.dataset) delete el.dataset[k]; } else if (el.dataset[k] !== v) el.dataset[k] = v; }
 function renderOutput(root, s, now) {
   const e = root._els; if (!e) return;
   const st = s.settings, t = activeTimer(s);
@@ -694,7 +1000,7 @@ function renderOutput(root, s, now) {
   root.classList.toggle('blackout', !!s.blackout);
   e.clock.textContent = fmtTod(new Date(now), st.clock24);
 
-  const { phase, text, endText, frac } = describe(s, now);
+  const d = describe(s, now); const { phase, text, endText, frac } = d;
   if (t) {
     e.title.textContent = t.title; e.speaker.textContent = t.speaker || '';
     const idx = s.timers.findIndex(x => x.id === t.id); const nx = s.timers[idx + 1];
@@ -704,10 +1010,11 @@ function renderOutput(root, s, now) {
     e.title.textContent = 'No timer selected'; e.speaker.textContent = ''; e.next.textContent = '';
   }
   e.time.textContent = text; e.time.className = 'o-time len' + Math.min(9, Math.max(5, text.length));
-  e.end.textContent = endText;
+  e.end.textContent = endText; e.end.className = 'o-endtext' + (d.waiting ? ' sched' : '');
   e.bar.style.width = (frac * 100) + '%';
   root.classList.toggle('normal', phase === 'normal'); root.classList.toggle('warn', phase === 'warn');
   root.classList.toggle('crit', phase === 'crit'); root.classList.toggle('over', phase === 'over');
+  root.classList.toggle('stopped', phase === 'stopped'); root.classList.toggle('paused', !!d.paused);
 
   const m = s.message;
   e.msg.textContent = m.text; e.msg.className = 'o-message' + (m.on && m.text ? ' on' : '') + ' ' + m.color + (m.bold ? ' bold' : '') + (m.upper ? ' upper' : '') + (m.flash ? ' flash' : '');
@@ -819,7 +1126,7 @@ if (IS_OUTPUT) {
   document.body.classList.add('output-mode');
   document.title = 'Stage Clock · Display';
   const root = mountOutput($('#bigOutput'));
-  $('#btnExitOverlay').textContent = 'Full screen (F)';
+  $('#btnExitOverlay').textContent = 'Full screen';
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
   document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
@@ -847,27 +1154,41 @@ if (IS_REMOTE_VIEW) {
   document.body.classList.add('remote-mode');
   document.title = 'Stage Clock · Remote';
   const pending = new Map();
-  let lastAck = '';
+  const PIN_INVITE = 'Enter the 4-digit PIN from the controller to take control. Watching needs no PIN.';
+  const pinEl = $('#rPin'), pinMsg = $('#rPinMsg');
+  let pinOk = false, pinChecked = false, pinDirty = true;
+  const hasPin = () => /^\d{4}$/.test(pinEl.value.trim());
+  const setPinMsg = (text, cls) => { pinMsg.textContent = text; pinMsg.className = 'r-pinmsg' + (cls ? ' ' + cls : ''); };
   const transport = openClientTransport({
     role: 'remote', codeContainer: $('#rConn'),
     onMessage: msg => {
       if (!msg) return;
-      if (msg.type === 'state') applyRemote(msg);
+      if (msg.type === 'state') { applyRemote(msg); if (pinDirty && hasPin()) verifyPin(); }
       else if (msg.type === 'ack') {
-        pending.delete(msg.id);
-        lastAck = msg.ok ? '' : (msg.reason || 'Not allowed');
-        $('#rPinMsg').textContent = msg.ok ? 'PIN accepted' : (msg.reason || 'Not allowed');
-        $('#rPinMsg').style.color = msg.ok ? '' : '#ffb3b3';
+        pending.delete(msg.id); pinChecked = true;
+        if (msg.ok) { pinOk = true; pinEl.classList.remove('bad'); setPinMsg('PIN accepted', 'ok'); }
+        else if (msg.reason === 'Wrong PIN') { pinOk = false; pinEl.classList.add('bad'); setPinMsg('Wrong PIN. Check the Remote panel on the controller.', 'bad'); }
+        else setPinMsg(msg.reason || 'Not allowed', 'bad');
       }
     },
   });
-  try { $('#rPin').value = sessionStorage.getItem('stage-clock-pin') || ''; } catch (e) {}
-  $('#rPin').addEventListener('input', () => { try { sessionStorage.setItem('stage-clock-pin', $('#rPin').value); } catch (e) {} });
+  // A "hello" carries the PIN and nothing else, so the phone learns whether it may control before the first real tap.
+  function verifyPin() {
+    if (!hasPin()) return;
+    const id = uid();
+    if (transport.send({ type: 'command', id, action: 'hello', pin: pinEl.value.trim() })) { pinDirty = false; pending.set(id, Date.now()); }
+  }
+  try { pinEl.value = sessionStorage.getItem('stage-clock-pin') || ''; } catch (e) {}
+  pinEl.addEventListener('input', () => {
+    pinEl.value = pinEl.value.replace(/\D/g, '').slice(0, 4);
+    try { sessionStorage.setItem('stage-clock-pin', pinEl.value); } catch (e) {}
+    pinOk = false; pinChecked = false; pinDirty = true; pinEl.classList.remove('bad');
+    if (hasPin()) verifyPin(); else setPinMsg(PIN_INVITE, '');
+  });
   function sendCommand(action, value) {
-    const pin = $('#rPin').value.trim();
-    if (!/^\d{4}$/.test(pin)) { $('#rPinMsg').textContent = 'Enter the 4-digit PIN from the controller'; $('#rPinMsg').style.color = '#ffb3b3'; $('#rPin').focus(); return; }
-    const id = uid(); const msg = { type: 'command', id, action, value, pin };
-    if (!transport.send(msg)) { $('#rConn').textContent = 'Not connected yet.'; return; }
+    if (!hasPin()) { setPinMsg(PIN_INVITE, 'bad'); pinEl.focus(); return; }
+    const id = uid(); const msg = { type: 'command', id, action, value, pin: pinEl.value.trim() };
+    if (!transport.send(msg)) { const ct = $('#rConnText'); if (ct) ct.textContent = 'Not connected yet.'; return; }
     pending.set(id, Date.now());
     if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
   }
@@ -880,15 +1201,26 @@ if (IS_REMOTE_VIEW) {
   $('#rMsgText').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); sendCommand('message', { text: $('#rMsgText').value.trim() }); } });
   window.__stageClock = { applyRemote, remote, sendCommand };
   const tick = () => {
-    const now = nowMs(), d = describe(state, now);
-    $('#rClock').textContent = fmtTod(new Date(now), state.settings.clock24);
-    if (remote.connected && d.t) {
-      $('#rTitle').textContent = d.t.title; $('#rTime').textContent = d.text; $('#rTime').className = 'r-time ' + d.phase;
-      $('#rSub').textContent = d.endText || (state.running ? 'Running' : 'Paused') + (d.t.speaker ? ' · ' + d.t.speaker : '');
-      $('#rPlay').textContent = state.running ? 'Pause' : 'Start';
-      $('#rBlackout').setAttribute('aria-pressed', String(!!state.blackout));
-    } else if (remote.connected) { $('#rTitle').textContent = 'No timer loaded'; $('#rTime').textContent = '--:--'; $('#rSub').textContent = ''; }
-    const c = $('#rConn'); if (remote.label) { c.textContent = remote.label; c.classList.toggle('bad', !remote.connected); }
+    const now = nowMs(), s = showState(state, now), d = s.d;
+    setText($('#rClock'), fmtTod(new Date(now), state.settings.clock24));
+    const nowBox = $('.r-now'), play = $('#rPlay'), bo = $('#rBlackout');
+    if (remote.connected && d) {
+      setText($('#rTitle'), d.t.title); setText($('#rTime'), d.text); $('#rTime').className = 'r-time ' + d.phase;
+      setData(nowBox, 'state', s.state);
+      setText($('#rState'), s.state === 'scheduled' ? s.label : STATE_LABEL[s.state]);
+      setText($('#rSpeaker'), d.t.speaker ? '· ' + d.t.speaker : '');
+      setText(play, s.play);
+      play.classList.toggle('primary', !state.running);
+      setData(play, 'state', state.running ? (s.state === 'over' ? 'over' : 'running') : null);
+      $('#rNext').classList.toggle('primary', state.running);
+      bo.setAttribute('aria-pressed', String(!!state.blackout)); setText(bo, state.blackout ? 'Blackout on · speaker sees nothing' : 'Blackout');
+    } else if (remote.connected) { setText($('#rTitle'), 'No timer loaded'); setText($('#rTime'), '--:--'); setText($('#rState'), ''); setText($('#rSpeaker'), ''); }
+    const c = $('#rConn'), ct = $('#rConnText');
+    if (ct && remote.label) ct.textContent = remote.label;
+    c.classList.toggle('bad', !remote.connected); c.classList.toggle('ok', remote.connected);
+    const locked = !pinOk;
+    $('#rGrid').toggleAttribute('data-locked', locked); $('#rMsg').toggleAttribute('data-locked', locked);
+    $('#rLock').textContent = !locked ? '' : !hasPin() ? 'Tap any control to jump to the PIN field' : pinChecked ? 'Controls are locked until the PIN matches' : 'Checking the PIN…';
     requestAnimationFrame(tick);
   };
   tick();
@@ -898,8 +1230,14 @@ if (IS_REMOTE_VIEW) {
 /* ============ CONTROLLER ============ */
 const preview = mountOutput($('#preview'));
 const bigOutput = mountOutput($('#bigOutput'));
+const sPreview = mountOutput($('#sPreview'));
 const overlay = $('#overlay');
 let popout = null;
+
+/* segmented controls: one handler, the value lives in data-value / data-kind / data-transport */
+const segVal = b => b.dataset.value ?? b.dataset.kind ?? b.dataset.transport ?? b.dataset.c;
+function setSeg(seg, value) { $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(segVal(x) === String(value)))); }
+function initSeg(seg, onPick) { if (!seg) return; seg.addEventListener('click', ev => { const b = ev.target.closest('button'); if (!b || b.disabled) return; setSeg(seg, segVal(b)); onPick(segVal(b), b); }); }
 
 function commit() {
   try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {}
@@ -914,26 +1252,27 @@ setInterval(pushRemote, 2000); // heartbeat: late joiners and clock offset refre
 function selectTimer(id, { keepRunning = false } = {}) {
   const t = state.timers.find(x => x.id === id); if (!t) return;
   state.activeId = id; state.remainingMs = t.duration * 1000; state.endAt = Date.now() + state.remainingMs;
-  state.running = keepRunning;
+  state.running = keepRunning; state.started = keepRunning;
   commit();
 }
 function play() {
   const t = activeTimer(); if (!t) return;
   if (state.running) { state.remainingMs = state.endAt - Date.now(); state.running = false; }
-  else { state.endAt = Date.now() + state.remainingMs; state.running = true; }
+  else { state.endAt = Date.now() + state.remainingMs; state.running = true; state.started = true; }
   commit();
 }
-function reset() { const t = activeTimer(); if (!t) return; state.running = false; state.remainingMs = t.duration * 1000; commit(); }
+function reset() { const t = activeTimer(); if (!t) return; state.running = false; state.started = false; state.remainingMs = t.duration * 1000; commit(); }
 function nudge(sec) {
   const t = activeTimer(); if (!t) return;
   if (state.running) state.endAt += sec * 1000; else state.remainingMs += sec * 1000;
   commit();
 }
+function markDone(t, now = Date.now()) { t.done = true; t.actualMs = Math.max(0, t.duration * 1000 - remainingMs(state, now)); }
 function step(dir) {
   const i = state.timers.findIndex(x => x.id === state.activeId);
   const n = state.timers[i + dir]; if (!n) return;
   const wasRunning = state.running;
-  if (dir > 0 && state.timers[i]) state.timers[i].done = true;
+  if (dir > 0 && state.timers[i]) markDone(state.timers[i]);
   selectTimer(n.id, { keepRunning: wasRunning });
 }
 function toggleFullscreen() {
@@ -987,7 +1326,7 @@ function engineStep(now) {
   const t = activeTimer();
   if (t && state.running && state.endAt - now <= 0) {
     const i = state.timers.findIndex(x => x.id === t.id); const n = state.timers[i + 1];
-    if (n && n.trigger === 'linked') { t.done = true; selectTimer(n.id, { keepRunning: true }); }
+    if (n && n.trigger === 'linked') { t.done = true; t.actualMs = t.duration * 1000; selectTimer(n.id, { keepRunning: true }); }
     else if (t.atZero === 'stop') { state.running = false; state.remainingMs = 0; commit(); }
   }
   // Scheduled starts: fire when the clock crosses a timer's start time (also catches up after a hidden tab)
@@ -996,7 +1335,7 @@ function engineStep(now) {
     const at = todayAt(s.startAt, now);
     if (at === null || at <= lastEngineAt || at > now) continue;
     if (s.id === state.activeId && state.running) continue;
-    const cur = activeTimer(); if (cur && cur.id !== s.id) cur.done = true;
+    const cur = activeTimer(); if (cur && cur.id !== s.id) markDone(cur, now);
     selectTimer(s.id, { keepRunning: true });
   }
   lastEngineAt = now;
@@ -1008,53 +1347,119 @@ try {
   clockWorker.onmessage = () => engineStep(Date.now());
 } catch (e) { setInterval(() => engineStep(Date.now()), 250); }
 
+/* --- the state of the show, in one place: running / paused / over / finished / scheduled / ready --- */
 function tick() {
   const now = Date.now(), t = activeTimer();
   renderOutput(preview, state, now);
   if (overlay.classList.contains('on')) renderOutput(bigOutput, state, now);
-  $('#topClock').textContent = fmtTod(new Date(now), state.settings.clock24);
-  if (t) {
-    const rem = remainingMs(state, now);
-    const waiting = !state.running && t.trigger === 'scheduled' && !t.done && todayAt(t.startAt, now) > now;
-    $('#statusLine').textContent = state.running ? (rem <= 0 ? 'Over time' : 'Running') : waiting ? `Starts automatically at ${t.startAt}` : (rem <= 0 ? 'Finished' : 'Paused');
-  } else $('#statusLine').textContent = '';
+  if (settingsDialog.open) renderOutput(sPreview, previewState(), now);
+  setText($('#topClock'), fmtTod(new Date(now), state.settings.clock24));
+  const s = showState(state, now);
+  setData($('#statusLine'), 'state', s.state); setData($('#previewWrap'), 'state', s.state);
+  setText($('#statusLabel'), s.label); setText($('#statusDetail'), s.detail);
+  const play = $('#btnPlay');
+  setText(play, s.play);
+  play.classList.toggle('primary', !state.running);
+  setData(play, 'state', state.running ? (s.state === 'over' ? 'over' : 'running') : null);
+  $('#btnNext').classList.toggle('primary', s.state === 'over' || s.state === 'finished');
+  const card = $('#rundown .timer-card.active');
+  if (card && t) {
+    setData(card, 'state', s.state);
+    const ph = $('.playhead', card);
+    setText($('.state b', card), s.state === 'scheduled' ? s.label : STATE_LABEL[s.state]);
+    setText($('.state .live', card), s.d ? s.d.text : '');
+    if (ph && s.d) { const left = ((1 - s.d.frac) * 100).toFixed(1) + '%'; if (ph.style.left !== left) ph.style.left = left; }
+  }
   requestAnimationFrame(tick);
 }
 
 /* --- rundown list --- */
+function thresholdBar(duration, warnAt, critAt) {
+  if (duration <= 0) return 'var(--track)';
+  const pct = sec => Math.min(100, Math.max(0, (duration - sec) / duration * 100));
+  const b = critAt > 0 ? pct(critAt) : 100;
+  let a = warnAt > 0 ? pct(warnAt) : b;
+  if (a > b) a = b;
+  return `linear-gradient(to right, var(--track) 0 ${a.toFixed(1)}%, var(--warn) ${a.toFixed(1)}% ${b.toFixed(1)}%, var(--crit) ${b.toFixed(1)}% 100%)`;
+}
+function cardSub(t) {
+  const bits = [];
+  if (t.speaker) bits.push(t.speaker);
+  if (t.trigger === 'linked') bits.push('starts after previous');
+  if (t.trigger === 'scheduled') bits.push(`starts ${t.startAt}`);
+  if (t.atZero === 'stop') bits.push('stops at 0');
+  if (t.mode === 'up') bits.push('counts up');
+  return bits.join(' · ');
+}
+let dragId = null;
+let openMenu = null;
+function disarm(btn) { if (!btn.dataset.confirm) return; delete btn.dataset.confirm; clearTimeout(btn._t); if (btn._label) btn.textContent = btn._label; }
+function closeMenus() { $$('.card-menu').forEach(m => { m.hidden = true; $$('[data-confirm]', m).forEach(disarm); }); openMenu = null; }
+function twoStep(btn, label, confirmLabel, fn) {
+  if (btn.dataset.confirm) { delete btn.dataset.confirm; btn.textContent = label; clearTimeout(btn._t); fn(); return; }
+  btn.dataset.confirm = '1'; btn._label = label; btn.textContent = confirmLabel;
+  btn._t = setTimeout(() => { delete btn.dataset.confirm; btn.textContent = label; }, 4000);
+}
+function deleteTimer(id) {
+  const i = state.timers.findIndex(x => x.id === id); if (i < 0) return;
+  state.timers.splice(i, 1);
+  if (state.activeId === id) { state.activeId = state.timers[0]?.id || null; state.running = false; state.remainingMs = (state.timers[0]?.duration || 0) * 1000; }
+  commit();
+}
 function renderRundown() {
-  const ul = $('#rundown'); ul.innerHTML = '';
+  const ul = $('#rundown'); ul.innerHTML = ''; openMenu = null;
   if (!state.timers.length) {
-    ul.innerHTML = '<li class="empty">No timers yet. Add one for each speaker or segment.</li>';
-    $('#total').textContent = ''; return;
+    ul.innerHTML = '<li class="empty"><b>No timers yet</b><span>Add the first segment, or import last event’s rundown.</span><div class="row"><button class="btn primary" data-empty="add">+ Add timer</button><button class="btn" data-empty="import">Import</button></div></li>';
+    $('[data-empty="add"]', ul).addEventListener('click', () => openTimerDialog(null));
+    $('[data-empty="import"]', ul).addEventListener('click', () => $('#btnImport').click());
+    $('#totalText').textContent = ''; $('#btnResetAll').hidden = true; return;
   }
+  $('#btnResetAll').hidden = false;
+  const touch = matchMedia('(pointer: coarse)').matches;
   state.timers.forEach((t, i) => {
     const li = document.createElement('li');
-    li.className = 'timer-card' + (t.id === state.activeId ? ' active' : '') + (t.done ? ' done' : '');
-    li.draggable = true; li.dataset.id = t.id;
+    const active = t.id === state.activeId;
+    li.className = 'timer-card' + (active ? ' active' : '') + (t.done ? ' done' : '');
+    li.draggable = !touch; li.dataset.id = t.id;
+    let right;
+    if (active) right = '<span class="state"><i class="dot"></i><b></b><span class="live"></span></span>';
+    else if (t.done) {
+      const actual = typeof t.actualMs === 'number' ? Math.round(t.actualMs / 1000) : null;
+      if (actual === null) right = '<span class="done-meta">done · planned <span class="mono"></span></span>';
+      else { const diff = actual - t.duration; right = `<span class="done-meta">planned <span class="mono"></span> · actual <b class="mono${diff > 0 ? ' late' : ''}">${fmtDur(actual)}${diff ? ` (${diff > 0 ? '+' : '−'}${fmtDur(Math.abs(diff))})` : ''}</b></span>`; }
+    } else right = '<span class="dur"></span>';
     li.innerHTML = `
-      <div class="idx">${i + 1}</div>
-      <div style="min-width:0">
-        <div class="title"></div>
-        <div class="meta"><span class="dur">${fmtDur(t.duration)}</span><span>${t.mode === 'up' ? 'count up' : 'countdown'}</span>
-          <span class="w">▲ ${fmtDur(t.warnAt)}</span><span class="c">▲ ${fmtDur(t.critAt)}</span>
-          ${t.atZero === 'stop' ? '<span>stops at 0</span>' : '<span>overtime</span>'}${t.trigger === 'linked' ? '<span>▶ after previous</span>' : t.trigger === 'scheduled' ? `<span>▶ at ${t.startAt}</span>` : ''}
-          <span class="speaker"></span></div>
-      </div>
+      <div class="idx">${t.done && !active ? '✓' : pad(i + 1)}</div>
+      <div class="body"><span class="title"></span><span class="sub"></span></div>
+      <div class="right">${right}</div>
+      <div class="bar">${active ? '<i class="playhead"></i>' : ''}</div>
       <div class="actions">
-        <button class="btn small" data-act="load" title="Load this timer">Load</button>
-        <button class="btn small" data-act="edit" title="Edit">✎</button>
-        <button class="btn small" data-act="dup" title="Duplicate">⧉</button>
-        <button class="btn small danger" data-act="del" title="Delete">✕</button>
+        ${active ? '' : '<button class="btn small" data-act="load" title="Load this timer">Load</button>'}
+        <button class="btn small icon edit" data-act="edit" title="Edit" aria-label="Edit">✎</button>
+        <button class="btn small icon" data-act="menu" title="More" aria-label="More" aria-haspopup="menu">⋯</button>
+        <div class="card-menu" role="menu" hidden>
+          <button type="button" data-act="edit-menu">Edit</button>
+          <button type="button" data-act="up" ${i === 0 ? 'disabled' : ''}>Move up</button>
+          <button type="button" data-act="down" ${i === state.timers.length - 1 ? 'disabled' : ''}>Move down</button>
+          <button type="button" data-act="dup">Duplicate</button>
+          <button type="button" class="danger" data-act="del">Delete</button>
+        </div>
       </div>`;
-    $('.title', li).textContent = t.title; $('.speaker', li).textContent = t.speaker || '';
-    li.addEventListener('dblclick', () => selectTimer(t.id));
+    $('.title', li).textContent = t.title; $('.sub', li).textContent = cardSub(t);
+    $('.bar', li).style.background = thresholdBar(t.duration, t.warnAt, t.critAt);
+    const dur = $('.right .dur', li); if (dur) dur.textContent = fmtDur(t.duration);
+    const planned = $('.done-meta .mono', li); if (planned) planned.textContent = fmtDur(t.duration);
+    li.addEventListener('dblclick', ev => { if (!ev.target.closest('.actions')) selectTimer(t.id); });
     li.addEventListener('click', ev => {
-      const act = ev.target.closest('[data-act]')?.dataset.act; if (!act) return;
+      const btn = ev.target.closest('[data-act]'); if (!btn) return;
+      const act = btn.dataset.act;
+      if (act === 'menu') { const m = $('.card-menu', li); const open = m.hidden; closeMenus(); m.hidden = !open; openMenu = open ? m : null; ev.stopPropagation(); return; }
       if (act === 'load') selectTimer(t.id);
-      if (act === 'edit') openTimerDialog(t);
-      if (act === 'dup') { const c = { ...t, id: uid(), done: false }; state.timers.splice(i + 1, 0, c); commit(); }
-      if (act === 'del') { state.timers.splice(i, 1); if (state.activeId === t.id) { state.activeId = state.timers[0]?.id || null; state.running = false; state.remainingMs = (state.timers[0]?.duration || 0) * 1000; } commit(); }
+      if (act === 'edit' || act === 'edit-menu') openTimerDialog(t);
+      if (act === 'up' && i > 0) { state.timers.splice(i - 1, 0, state.timers.splice(i, 1)[0]); commit(); }
+      if (act === 'down' && i < state.timers.length - 1) { state.timers.splice(i + 1, 0, state.timers.splice(i, 1)[0]); commit(); }
+      if (act === 'dup') { const { actualMs, ...rest } = t; const c = { ...rest, id: uid(), done: false }; state.timers.splice(i + 1, 0, c); commit(); }
+      if (act === 'del') { ev.stopPropagation(); twoStep(btn, 'Delete', 'Delete? Click again', () => deleteTimer(t.id)); }
     });
     li.addEventListener('dragstart', ev => { dragId = t.id; li.classList.add('dragging'); ev.dataTransfer.effectAllowed = 'move'; try { ev.dataTransfer.setData('text/plain', t.id); } catch (e) {} });
     li.addEventListener('dragend', () => { dragId = null; $$('.timer-card').forEach(x => x.classList.remove('dragging', 'drop-before')); });
@@ -1066,21 +1471,73 @@ function renderRundown() {
     });
     ul.appendChild(li);
   });
-  const total = state.timers.reduce((a, t) => a + t.duration, 0);
-  $('#total').textContent = `${state.timers.length} timers · total ${fmtDur(total)} · drag cards to reorder, double-click to load`;
+  const total = state.timers.reduce((a, t) => a + t.duration, 0), done = state.timers.filter(t => t.done).length;
+  $('#totalText').textContent = `${state.timers.length} timer${state.timers.length === 1 ? '' : 's'} · ${fmtDur(total)} planned${done ? ` · ${done} done` : ''}`;
 }
-let dragId = null;
+document.addEventListener('click', ev => { if (openMenu && !ev.target.closest('.card-menu') && !ev.target.closest('[data-act="menu"]')) closeMenus(); });
 
 function renderControls() {
-  $('#btnPlay').textContent = state.running ? 'Pause' : 'Start';
   $('#btnBlackout').setAttribute('aria-pressed', String(!!state.blackout));
-  const m = state.message;
+  $('#btnBlackout').textContent = state.blackout ? 'Blackout on' : 'Blackout';
+  const m = state.message, on = !!(m.on && m.text);
   $$('.msg-colors .btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.c === m.color)));
+  const chip = $('#msgState'); chip.textContent = on ? 'On screen' : 'Presets fill the box, Show sends it'; chip.classList.toggle('on', on);
+  $('#btnMsgShow').classList.toggle('primary', !on); $('#btnMsgHide').classList.toggle('primary', on);
+  const t = activeTimer(), idx = state.timers.findIndex(x => x.id === state.activeId);
+  $('#nowIndex').textContent = t ? `${idx + 1} of ${state.timers.length} · ${t.title}` : '';
+  if (!editingPresets) renderPresets(); updateFirstRun();
 }
+
+/* --- first run: one strip under the top bar while the sample rundown is loaded --- */
+const FIRSTRUN_KEY = 'stage-clock-firstrun';
+function updateFirstRun() {
+  let seen = false; try { seen = !!localStorage.getItem(FIRSTRUN_KEY); } catch (e) {}
+  const sample = state.timers.length === SAMPLE_TIMERS.length && state.timers.every((t, i) => t.title === SAMPLE_TIMERS[i].title);
+  $('#firstRun').hidden = seen || !sample;
+}
+$('#firstRunDismiss').addEventListener('click', () => { try { localStorage.setItem(FIRSTRUN_KEY, '1'); } catch (e) {} $('#firstRun').hidden = true; });
+
+/* --- top bar: the overflow menu on small screens, help on every screen --- */
+const topbar = $('.topbar');
+function setMenu(open) { topbar.classList.toggle('open', open); $('#btnMore').setAttribute('aria-expanded', String(open)); }
+$('#btnMore').addEventListener('click', ev => { ev.stopPropagation(); setMenu(!topbar.classList.contains('open')); });
+$('#topMenu').addEventListener('click', ev => { if (ev.target.closest('.btn')) setMenu(false); });
+document.addEventListener('click', ev => { if (topbar.classList.contains('open') && !ev.target.closest('.topbar')) setMenu(false); });
+const helpDialog = $('#helpDialog');
+$('#btnHelp').addEventListener('click', () => helpDialog.showModal());
+$('#helpClose').addEventListener('click', () => helpDialog.close());
 
 /* --- timer dialog --- */
 const timerDialog = $('#timerDialog');
 let editingId = null;
+const num = id => Math.max(0, parseInt($(id).value, 10) || 0);
+const PRESET_SEGS = { tWarn: ['tWarnM', 'tWarnS'], tCrit: ['tCritM', 'tCritS'] };
+function pickThreshold(which, secs) {
+  const seg = $(`[data-seg="${which}"]`); const match = $$('button', seg).find(b => b.dataset.value === String(secs));
+  setSeg(seg, match ? String(secs) : 'custom'); $(`#${which}Custom`).hidden = !!match;
+}
+function thresholdValues() {
+  return { duration: num('#tH') * 3600 + num('#tM') * 60 + num('#tS'), warnAt: num('#tWarnM') * 60 + num('#tWarnS'), critAt: num('#tCritM') * 60 + num('#tCritS') };
+}
+function refreshThresholds() {
+  const { duration, warnAt, critAt } = thresholdValues();
+  $('#tBar').style.background = thresholdBar(duration, warnAt, critAt);
+  const labels = $('#tBarLabels'); labels.innerHTML = '';
+  if (duration > 0) {
+    const add = (txt, cls, left) => { const s = document.createElement('span'); s.textContent = txt; s.className = cls; if (left !== undefined) s.style.left = left; labels.appendChild(s); };
+    add('0:00', '', '0');
+    if (warnAt > 0 && warnAt < duration) add(`${fmtDur(duration - warnAt)} · yellow`, 'w', `${((duration - warnAt) / duration * 100).toFixed(1)}%`);
+    if (critAt > 0) add(`${fmtDur(Math.max(0, duration - critAt))} · red`, 'c');
+  }
+  let err = '';
+  if (duration <= 0) err = 'Set a duration first.';
+  else if (warnAt > duration || critAt > duration) err = `Longer than the timer: the timer is ${fmtDur(duration)}.`;
+  else if (warnAt > 0 && critAt > 0 && critAt > warnAt) err = `Red must come before yellow: ${fmtDur(critAt)} is more than ${fmtDur(warnAt)} left.`;
+  const v = $('#tValidation'); v.textContent = err; v.hidden = !err;
+  ['#tWarnM', '#tWarnS', '#tCritM', '#tCritS'].forEach(id => $(id).classList.toggle('bad', !!err && err.startsWith('Red') && id.startsWith('#tCrit')));
+  $('#tSave').disabled = !!err;
+  return !err;
+}
 function openTimerDialog(t) {
   editingId = t ? t.id : null;
   $('#timerDialogTitle').textContent = t ? 'Edit timer' : 'Add timer';
@@ -1089,19 +1546,35 @@ function openTimerDialog(t) {
   $('#tH').value = Math.floor(d / 3600); $('#tM').value = Math.floor((d % 3600) / 60); $('#tS').value = d % 60;
   $('#tWarnM').value = Math.floor(w / 60); $('#tWarnS').value = w % 60;
   $('#tCritM').value = Math.floor(c / 60); $('#tCritS').value = c % 60;
-  $('#tMode').value = t ? t.mode : 'down'; $('#tZero').value = t ? t.atZero : 'continue';
-  $('#tTrigger').value = t ? (t.trigger || 'manual') : 'manual'; $('#tStartAt').value = t ? (t.startAt || '') : '';
-  $('#tStartAt').hidden = $('#tTrigger').value !== 'scheduled';
+  pickThreshold('tWarn', w); pickThreshold('tCrit', c);
+  $('#tMode').value = t ? t.mode : 'down'; setSeg($('[data-seg="tMode"]'), $('#tMode').value);
+  $('#tZero').value = t ? t.atZero : 'continue'; setSeg($('[data-seg="tZero"]'), $('#tZero').value);
+  $('#tTrigger').value = t ? (t.trigger || 'manual') : 'manual'; setSeg($('[data-seg="tTrigger"]'), $('#tTrigger').value);
+  $('#tStartAt').value = t ? (t.startAt || '') : '';
+  $('#tStartAt').disabled = $('#tTrigger').value !== 'scheduled';
+  const del = $('#tDelete'); del.hidden = !t; delete del.dataset.confirm; del.textContent = 'Delete timer';
+  refreshThresholds();
   timerDialog.showModal(); $('#tTitle').focus();
 }
-const num = id => Math.max(0, parseInt($(id).value, 10) || 0);
+for (const which of Object.keys(PRESET_SEGS)) {
+  initSeg($(`[data-seg="${which}"]`), v => {
+    const [mId, sId] = PRESET_SEGS[which];
+    if (v === 'custom') { $(`#${which}Custom`).hidden = false; $('#' + mId).focus(); }
+    else { $(`#${which}Custom`).hidden = true; $('#' + mId).value = Math.floor(+v / 60); $('#' + sId).value = +v % 60; }
+    refreshThresholds();
+  });
+}
+['#tH', '#tM', '#tS', '#tWarnM', '#tWarnS', '#tCritM', '#tCritS'].forEach(id => $(id).addEventListener('input', refreshThresholds));
+initSeg($('[data-seg="tMode"]'), v => { $('#tMode').value = v; });
+initSeg($('[data-seg="tZero"]'), v => { $('#tZero').value = v; });
+initSeg($('[data-seg="tTrigger"]'), v => { $('#tTrigger').value = v; $('#tStartAt').disabled = v !== 'scheduled'; if (v === 'scheduled') $('#tStartAt').focus(); });
+$('#tTrigger').addEventListener('change', () => { setSeg($('[data-seg="tTrigger"]'), $('#tTrigger').value); $('#tStartAt').disabled = $('#tTrigger').value !== 'scheduled'; });
 $('#timerForm').addEventListener('submit', ev => {
   ev.preventDefault();
-  const duration = num('#tH') * 3600 + num('#tM') * 60 + num('#tS');
-  if (duration <= 0) { $('#tM').focus(); return; }
+  if (!refreshThresholds()) { $('#tM').focus(); return; }
+  const { duration, warnAt, critAt } = thresholdValues();
   const data = {
-    title: $('#tTitle').value.trim() || 'Untitled', speaker: $('#tSpeaker').value.trim(), duration,
-    warnAt: num('#tWarnM') * 60 + num('#tWarnS'), critAt: num('#tCritM') * 60 + num('#tCritS'),
+    title: $('#tTitle').value.trim() || 'Untitled', speaker: $('#tSpeaker').value.trim(), duration, warnAt, critAt,
     mode: $('#tMode').value, atZero: $('#tZero').value,
     trigger: $('#tTrigger').value, startAt: $('#tTrigger').value === 'scheduled' ? $('#tStartAt').value : '',
   };
@@ -1116,9 +1589,12 @@ $('#timerForm').addEventListener('submit', ev => {
   timerDialog.close(); commit();
 });
 $('#tCancel').addEventListener('click', () => timerDialog.close());
-$('#tTrigger').addEventListener('change', () => { $('#tStartAt').hidden = $('#tTrigger').value !== 'scheduled'; if (!$('#tStartAt').hidden) $('#tStartAt').focus(); });
+$('#tDelete').addEventListener('click', () => twoStep($('#tDelete'), 'Delete timer', 'Delete? Click again', () => { timerDialog.close(); deleteTimer(editingId); }));
 $('#btnAdd').addEventListener('click', () => openTimerDialog(null));
-$('#btnResetAll').addEventListener('click', () => { state.timers.forEach(t => t.done = false); if (state.timers[0]) selectTimer(state.timers[0].id); else commit(); });
+$('#btnResetAll').addEventListener('click', () => twoStep($('#btnResetAll'), 'Reset all…', 'Reset all?', () => {
+  state.timers.forEach(t => { t.done = false; delete t.actualMs; });
+  if (state.timers[0]) selectTimer(state.timers[0].id); else commit();
+}));
 
 /* --- transport wiring --- */
 $('#btnPlay').addEventListener('click', play);
@@ -1147,26 +1623,57 @@ $('#msgText').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.p
 $$('#msgBold, #msgUpper, #msgFlash').forEach(el => el.addEventListener('change', () => { syncMessageForm(); commit(); }));
 $$('.msg-colors .btn').forEach(b => b.addEventListener('click', () => { state.message.color = b.dataset.c; commit(); }));
 $('#msgText').value = state.message.text; $('#msgBold').checked = state.message.bold; $('#msgUpper').checked = state.message.upper; $('#msgFlash').checked = state.message.flash;
+let editingPresets = false;
+function renderPresets() {
+  const box = $('#msgPresets'); box.innerHTML = '';
+  const list = Array.isArray(state.settings.presets) ? state.settings.presets : DEFAULT_SETTINGS.presets;
+  const mk = (cls, text) => { const b = document.createElement('button'); b.type = 'button'; b.className = cls; b.textContent = text; return b; };
+  if (editingPresets) {
+    list.forEach(p => { const inp = document.createElement('input'); inp.type = 'text'; inp.value = p; inp.maxLength = 60; inp.setAttribute('aria-label', 'Preset message'); box.appendChild(inp); });
+    const inp = document.createElement('input'); inp.type = 'text'; inp.placeholder = 'New preset'; inp.maxLength = 60; inp.setAttribute('aria-label', 'New preset message'); box.appendChild(inp);
+    const done = mk('btn small primary', 'Done');
+    done.addEventListener('click', () => { state.settings.presets = $$('input', box).map(x => x.value.trim()).filter(Boolean).slice(0, 8); editingPresets = false; commit(); });
+    box.appendChild(done);
+  } else {
+    list.forEach(p => { const b = mk('btn small', p); b.dataset.preset = p; b.addEventListener('click', () => { $('#msgText').value = p; syncMessageForm(); $('#msgText').focus(); }); box.appendChild(b); });
+    const edit = mk('btn small quiet', 'Edit presets'); edit.addEventListener('click', () => { editingPresets = true; renderPresets(); }); box.appendChild(edit);
+  }
+}
 
 /* --- settings --- */
 const settingsDialog = $('#settingsDialog');
 const SETTING_FIELDS = { bg: 'sBg', fg: 'sFg', dim: 'sDim', warn: 'sWarn', crit: 'sCrit', font: 'sFont', endStyle: 'sEnd', endText: 'sEndText',
   showTitle: 'sShowTitle', showSpeaker: 'sShowSpeaker', showClock: 'sShowClock', showNext: 'sShowNext', showProgress: 'sShowProgress', clock24: 'sClock24', hideHours: 'sHideHours' };
+function paintSwatches() {
+  $$('label.swatch input[type="color"]').forEach(inp => {
+    $(`.chipc[data-for="${inp.id}"]`).style.background = inp.value; $(`.hex[data-for="${inp.id}"]`).textContent = inp.value;
+  });
+}
 function fillSettings() {
   for (const [k, id] of Object.entries(SETTING_FIELDS)) {
     const el = $('#' + id); if (el.type === 'checkbox') el.checked = !!state.settings[k]; else el.value = state.settings[k];
   }
+  setSeg($('[data-seg="sFontSeg"]'), state.settings.font); paintSwatches();
 }
 for (const [k, id] of Object.entries(SETTING_FIELDS)) {
-  $('#' + id).addEventListener('input', ev => { const el = ev.target; state.settings[k] = el.type === 'checkbox' ? el.checked : el.value; commit(); });
+  $('#' + id).addEventListener('input', ev => { const el = ev.target; state.settings[k] = el.type === 'checkbox' ? el.checked : el.value; paintSwatches(); commit(); });
+}
+initSeg($('[data-seg="sFontSeg"]'), v => { const sel = $('#sFont'); sel.value = v; sel.dispatchEvent(new Event('input')); });
+let previewPhase = 'normal';
+initSeg($('[data-seg="previewPhase"]'), v => { previewPhase = v; });
+function previewState() {
+  const t = { id: 'p1', title: 'Opening keynote', speaker: 'Dr. Amara Okafor', duration: 1200, warnAt: 300, critAt: 60, mode: 'down', atZero: 'continue', trigger: 'manual', startAt: '', done: false };
+  const nx = { id: 'p2', title: 'Panel: Shipping on time', speaker: '', duration: 1800, warnAt: 300, critAt: 120, mode: 'down', atZero: 'continue', trigger: 'manual', startAt: '', done: false };
+  const rem = { normal: 754, warn: 299, crit: 59, over: -42 }[previewPhase] * 1000;
+  return { v: 1, timers: [t, nx], activeId: 'p1', running: false, endAt: 0, remainingMs: rem, message: { text: '', color: 'white', bold: false, upper: false, flash: false, on: false }, blackout: false, flashNonce: sPreview._lastFlash, settings: state.settings, preview: true };
 }
 $('#btnSettings').addEventListener('click', () => { fillSettings(); settingsDialog.showModal(); });
 $('#sClose').addEventListener('click', () => settingsDialog.close());
-$('#sDefaults').addEventListener('click', () => { state.settings = { ...DEFAULT_SETTINGS }; fillSettings(); commit(); });
+$('#sDefaults').addEventListener('click', () => { const { presets, relayUrl } = state.settings; state.settings = { ...DEFAULT_SETTINGS, presets, relayUrl }; fillSettings(); commit(); });
 
 /* --- import / export --- */
 const ioDialog = $('#ioDialog');
-function exportJson() { return JSON.stringify({ app: 'stage-clock', v: 1, timers: state.timers.map(({ done, ...t }) => t), settings: state.settings }, null, 2); }
+function exportJson() { return JSON.stringify({ app: 'stage-clock', v: 1, timers: state.timers.map(({ done, actualMs, ...t }) => t), settings: state.settings }, null, 2); }
 $('#btnExport').addEventListener('click', () => {
   $('#ioTitle').textContent = 'Export rundown'; $('#ioHint').textContent = 'Copy this JSON or download it. Import it on another machine to restore the rundown and appearance.';
   const json = exportJson(); $('#ioText').value = json; $('#ioText').readOnly = true;
@@ -1220,20 +1727,43 @@ document.addEventListener('keydown', ev => {
     case 'b': case 'B': state.blackout = !state.blackout; commit(); break;
     case 'x': case 'X': state.flashNonce++; commit(); break;
     case 'm': case 'M': ev.preventDefault(); $('#msgText').focus(); break;
+    case '?': ev.preventDefault(); helpDialog.showModal(); break;
   }
 });
 document.addEventListener('fullscreenchange', () => { if (!document.fullscreenElement && overlay.classList.contains('on')) overlay.classList.remove('on'); });
 
-/* --- remote displays over the venue Wi-Fi (desktop app only) --- */
+/* --- remote displays panel: one transport visible at a time --- */
+const remotePanel = $('#remotePanel');
 const linkKind = { lan: 'output', room: 'output', relay: 'output', onChange: {} };
-$$('.seg').forEach(seg => seg.addEventListener('click', ev => {
-  const b = ev.target.closest('button'); if (!b) return;
-  const which = seg.dataset.seg; linkKind[which] = b.dataset.kind;
-  $$('button', seg).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
-  if (linkKind.onChange[which]) linkKind.onChange[which]();
-}));
+for (const which of ['lan', 'room', 'relay']) {
+  initSeg($(`.seg[data-seg="${which}"]`), kind => {
+    linkKind[which] = kind;
+    $(`#${which}KindHint`).textContent = kind === 'remote' ? 'The QR and link open as a phone remote' : 'The QR and link open as a display';
+    if (linkKind.onChange[which]) linkKind.onChange[which]();
+  });
+}
+function showTransport(name) { setSeg($('[data-seg="transport"]'), name); $$('section[data-transport]').forEach(s => { s.hidden = s.dataset.transport !== name; }); }
+initSeg($('[data-seg="transport"]'), v => showTransport(v));
+showTransport(window.stageClock && window.stageClock.lanInfo ? 'lan' : 'room');
+const counts = { lan: 0, room: 0, relay: 0 };
+function setClients(which, n) {
+  counts[which] = n;
+  const el = $('#' + which + 'Clients'); el.textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; el.classList.toggle('on', n > 0);
+  const total = counts.lan + counts.room + counts.relay, rc = $('#remoteCount');
+  rc.textContent = total === 0 ? 'Nothing connected' : total === 1 ? '1 connected' : `${total} connected`; rc.classList.toggle('on', total > 0);
+}
 $('#pinValue').textContent = state.pin;
-$('#pinNew').addEventListener('click', () => { state.pin = newPin(); $('#pinValue').textContent = state.pin; commit(); });
+$('#pinNew').addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); state.pin = newPin(); $('#pinValue').textContent = state.pin; commit(); });
+function drawQr(box, url) { box.innerHTML = ''; if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); } }
+function copyButton(btnId, inputId) {
+  $('#' + btnId).addEventListener('click', () => {
+    const v = $('#' + inputId).value;
+    navigator.clipboard?.writeText(v).then(() => { $('#' + btnId).textContent = 'Copied'; setTimeout(() => $('#' + btnId).textContent = 'Copy link', 1500); }).catch(() => { $('#' + inputId).select(); });
+  });
+}
+copyButton('lanCopy', 'lanUrl'); copyButton('roomCopy', 'roomUrl'); copyButton('relayCopy', 'relayLink');
+
+/* --- remote displays over the venue Wi-Fi (desktop app only) --- */
 function setupLanRemote() {
   const bridge = window.stageClock; if (!bridge || !bridge.lanInfo) return;
   remote.sinks.push(msg => bridge.publish(msg));
@@ -1243,34 +1773,30 @@ function setupLanRemote() {
     const sel = $('#lanAddr'); sel.innerHTML = '';
     info.urls.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); });
     sel.hidden = info.urls.length < 2;
-    const show = () => {
-      const url = sel.value + '/?view=' + linkKind.lan + '&lan=1'; $('#lanUrl').value = url;
-      const box = $('#lanQr'); box.innerHTML = '';
-      if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
-    };
+    const show = () => { const url = sel.value + '/?view=' + linkKind.lan + '&lan=1'; $('#lanUrl').value = url; drawQr($('#lanQr'), url); };
     sel.addEventListener('change', show); show(); linkKind.onChange.lan = show;
     pushRemote();
   }).catch(() => {});
   if (bridge.onCommand) bridge.onCommand(({ clientId, msg }) => { const ack = ackFor(msg); if (bridge.reply) bridge.reply(clientId, ack); });
-  if (bridge.onClients) bridge.onClients(n => { $('#lanClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; });
-  $('#lanCopy').addEventListener('click', () => {
-    const v = $('#lanUrl').value;
-    navigator.clipboard?.writeText(v).then(() => { $('#lanCopy').textContent = 'Copied'; setTimeout(() => $('#lanCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#lanUrl').select(); });
-  });
+  if (bridge.onClients) bridge.onClients(n => setClients('lan', n));
 }
 setupLanRemote();
 
 /* --- remote displays anywhere: host a room over PeerJS --- */
 const room = { code: '', peer: null, conns: new Set(), sink: null };
-function roomUpdateClients() { const n = room.conns.size; $('#roomClients').textContent = n === 0 ? 'No displays connected' : n === 1 ? '1 display connected' : `${n} displays connected`; }
+const relay = { code: '', sock: null, sink: null, stopped: true };
+function updateRemoteSummary() {
+  const code = room.code || relay.code, el = $('#remoteCodeSummary');
+  el.innerHTML = code ? 'Room <b></b>' : ''; if (code) $('b', el).textContent = code;
+}
 function roomShow() {
   $('#roomOff').hidden = true; $('#roomOn').hidden = false; $('#roomCode').textContent = room.code;
-  const url = viewLink(linkKind.room, 'room=' + room.code); $('#roomUrl').value = url;
-  const box = $('#roomQr'); box.innerHTML = '';
-  if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
-  roomUpdateClients();
+  const url = viewLink(linkKind.room, 'room=' + room.code); $('#roomUrl').value = url; drawQr($('#roomQr'), url);
+  setClients('room', room.conns.size); updateRemoteSummary();
+  if (room.reveal) { room.reveal = false; remotePanel.open = true; showTransport('room'); }
 }
-function roomStart(code) {
+function roomStart(code, { reveal = true } = {}) {
+  room.reveal = reveal;
   room.code = code || Array.from({ length: 6 }, () => ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)]).join('');
   $('#roomError').textContent = 'Starting…';
   loadPeerJs().then(() => {
@@ -1283,10 +1809,10 @@ function roomStart(code) {
       roomShow(); pushRemote();
     });
     room.peer.on('connection', c => {
-      c.on('open', () => { room.conns.add(c); roomUpdateClients(); try { c.send(remoteMessage()); } catch (e) {} });
+      c.on('open', () => { room.conns.add(c); setClients('room', room.conns.size); try { c.send(remoteMessage()); } catch (e) {} });
       c.on('data', msg => { if (msg && msg.type === 'command') { try { c.send(ackFor(msg)); } catch (e) {} } });
-      c.on('close', () => { room.conns.delete(c); roomUpdateClients(); });
-      c.on('error', () => { room.conns.delete(c); roomUpdateClients(); });
+      c.on('close', () => { room.conns.delete(c); setClients('room', room.conns.size); });
+      c.on('error', () => { room.conns.delete(c); setClients('room', room.conns.size); });
     });
     room.peer.on('error', err => {
       if (err && err.type === 'unavailable-id') { roomStop(); roomStart(); return; }   // code taken: try another
@@ -1301,25 +1827,23 @@ function roomStop() {
   room.peer = null; room.sink = null; room.conns.clear(); room.code = '';
   try { sessionStorage.removeItem('stage-clock-room'); } catch (e) {}
   $('#roomOff').hidden = false; $('#roomOn').hidden = true; $('#roomError').textContent = '';
+  setClients('room', 0); updateRemoteSummary();
 }
 $('#roomStart').addEventListener('click', () => roomStart());
 $('#roomStop').addEventListener('click', roomStop);
-$('#roomCopy').addEventListener('click', () => {
-  const v = $('#roomUrl').value;
-  navigator.clipboard?.writeText(v).then(() => { $('#roomCopy').textContent = 'Copied'; setTimeout(() => $('#roomCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#roomUrl').select(); });
-});
-try { const saved = sessionStorage.getItem('stage-clock-room'); if (saved && saved.length === 6) roomStart(saved); } catch (e) {}
+try { const saved = sessionStorage.getItem('stage-clock-room'); if (saved && saved.length === 6) roomStart(saved, { reveal: false }); } catch (e) {}
+
 /* --- remote displays anywhere: through the organiser's own relay --- */
-const relay = { code: '', sock: null, sink: null, stopped: true };
 $('#relayUrl').value = state.settings.relayUrl || '';
 $('#relayUrl').addEventListener('change', () => { state.settings.relayUrl = $('#relayUrl').value.trim(); commit(); });
 function relayShow() {
   $('#relayOn').hidden = false; $('#relayCode').textContent = relay.code;
-  const url = viewLink(linkKind.relay, 'relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url;
-  const box = $('#relayQr'); box.innerHTML = '';
-  if (typeof qrcode === 'function') { const q = qrcode(0, 'M'); q.addData(url); q.make(); box.innerHTML = q.createSvgTag({ scalable: true, margin: 0 }); }
+  const url = viewLink(linkKind.relay, 'relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url; drawQr($('#relayQr'), url);
+  updateRemoteSummary();
+  if (relay.reveal) { relay.reveal = false; remotePanel.open = true; showTransport('relay'); }
 }
-function relayStart(code) {
+function relayStart(code, { reveal = true } = {}) {
+  relay.reveal = reveal;
   state.settings.relayUrl = $('#relayUrl').value.trim();
   let target; try { if (!state.settings.relayUrl) throw new Error('Enter the relay address first.'); target = relaySocketUrl(state.settings.relayUrl, code || 'XXXXXX', 'controller'); } catch (e) { $('#relayError').textContent = e.message.startsWith('Enter') ? e.message : 'That relay address is not a valid URL.'; return; }
   relay.code = code || Array.from({ length: 6 }, () => ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)]).join('');
@@ -1337,7 +1861,7 @@ function relayStart(code) {
     relay.sock.onmessage = ev => {
       try {
         const m = JSON.parse(ev.data);
-        if (m.type === 'clients') $('#relayClients').textContent = m.n === 0 ? 'No displays connected' : m.n === 1 ? '1 display connected' : `${m.n} displays connected`;
+        if (m.type === 'clients') setClients('relay', m.n);
         else if (m.type === 'command' && m.from) relay.sock.send(JSON.stringify({ type: 'reply', to: m.from, msg: ackFor(m) }));
       } catch (e) {}
     };
@@ -1353,14 +1877,11 @@ function relayStop() {
   relay.sock = null; relay.sink = null; relay.code = '';
   try { sessionStorage.removeItem('stage-clock-relay-room'); } catch (e) {}
   $('#relayOn').hidden = true; $('#relayError').textContent = '';
+  setClients('relay', 0); updateRemoteSummary();
 }
 $('#relayStart').addEventListener('click', () => { relayStop(); relayStart(); });
 $('#relayStop').addEventListener('click', relayStop);
-$('#relayCopy').addEventListener('click', () => {
-  const v = $('#relayLink').value;
-  navigator.clipboard?.writeText(v).then(() => { $('#relayCopy').textContent = 'Copied'; setTimeout(() => $('#relayCopy').textContent = 'Copy link', 1500); }).catch(() => { $('#relayLink').select(); });
-});
-try { const saved = sessionStorage.getItem('stage-clock-relay-room'); if (saved && saved.length === 6 && state.settings.relayUrl) relayStart(saved); } catch (e) {}
+try { const saved = sessionStorage.getItem('stage-clock-relay-room'); if (saved && saved.length === 6 && state.settings.relayUrl) relayStart(saved, { reveal: false }); } catch (e) {}
 linkKind.onChange.room = () => { if (room.code) roomShow(); };
 linkKind.onChange.relay = () => { if (relay.code) relayShow(); };
 window.__stageClock = { room, relay, remote, applyCommand };

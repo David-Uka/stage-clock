@@ -14,4 +14,9 @@ async function openWithState(page, state, { noRaf = false } = {}) {
   await page.goto('/index.html');
 }
 const readState = page => page.evaluate(k => JSON.parse(localStorage.getItem(k)), KEY);
-module.exports = { KEY, timer, stateWith, openWithState, readState };
+// The remote-displays panel is collapsed by default and shows one transport at a time.
+async function openTransport(page, name) {
+  await page.evaluate(() => { document.getElementById('remotePanel').open = true; });
+  await page.click(`[data-seg="transport"] [data-transport="${name}"]`);
+}
+module.exports = { KEY, timer, stateWith, openWithState, readState, openTransport };

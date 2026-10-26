@@ -48,3 +48,16 @@ test('nudging adds time while running', async ({ page }) => {
   await page.click('[data-nudge="60"]');
   await expect(page.locator('#preview .o-time')).toHaveText(/^01:5\d$/);
 });
+
+test('browser chords are not shortcuts: Cmd+R / Ctrl+R leave a running timer alone', async ({ page }) => {
+  const t = timer({ duration: 60 });
+  await openWithState(page, stateWith([t]));
+  await page.click('#btnPlay');
+  await page.keyboard.press('Meta+r'); await page.keyboard.press('Control+r'); await page.keyboard.press('Meta+f'); await page.keyboard.press('Control+p');
+  const s = await readState(page);
+  expect(s.running).toBe(true);
+  expect(s.activeId).toBe(t.id);
+  await expect(page.locator('#overlay')).not.toHaveClass(/on/);
+  await page.keyboard.press('r');
+  expect((await readState(page)).running).toBe(false);
+});

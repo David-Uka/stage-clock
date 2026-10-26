@@ -139,3 +139,37 @@ test('relay: a phone remote controls the timer end to end', async ({ page, conte
   await expect(phone.locator('#rTime')).toHaveText(/^05:5\d$/);
   await phone.close(); wss.close();
 });
+
+// Like fakePeer, but connections stay closed until the test opens them.
+const noAutoOpen = () => { window.Peer.prototype.connect = function (id) { const c = new window.__Conn(id); window.__conns.push(c); return c; }; };
+
+test('phone remote says it is not connected instead of checking a PIN forever, and re-sends the PIN check', async ({ page }) => {
+  await page.addInitScript(fakePeer); await page.addInitScript(noAutoOpen);
+  await page.goto('/index.html?view=remote&room=ABC234');
+  await expect.poll(() => page.evaluate(() => window.__conns.length)).toBe(1);
+  // The data channel exists but is not open: nothing can reach the controller yet.
+  await page.fill('#rPin', '4821');
+  await expect(page.locator('#rLock')).toHaveText('Controls unlock once this phone reaches the controller');
+  expect(await page.evaluate(() => window.__conns[0].sent.length)).toBe(0);
+  // The channel opens and the controller pushes state: the PIN check goes out by itself, and again if unanswered.
+  await page.evaluate(() => { const c = window.__conns[0]; c.open = true; c.emit('open'); });
+  const s = stateWith([timer({ title: 'Keynote' })]);
+  await page.evaluate(st => window.__conns[0].emit('data', { type: 'state', state: st, sentAt: Date.now() }), s);
+  await expect.poll(() => page.evaluate(() => window.__conns[0].sent.filter(m => m.action === 'hello').length)).toBeGreaterThanOrEqual(1);
+  await expect(page.locator('#rLock')).toHaveText('Checking the PIN…');
+  await expect.poll(() => page.evaluate(() => window.__conns[0].sent.filter(m => m.action === 'hello').length), { timeout: 8000 }).toBeGreaterThanOrEqual(2);
+  const last = await page.evaluate(() => window.__conns[0].sent.at(-1));
+  await page.evaluate(id => window.__conns[0].emit('data', { type: 'ack', id, ok: true }), last.id);
+  await expect(page.locator('#rPinMsg')).toHaveText('PIN accepted');
+  await expect(page.locator('#rLock')).toHaveText('');
+});
+
+test('display explains a connection that never completes', async ({ page }) => {
+  await page.clock.install();
+  await page.addInitScript(fakePeer); await page.addInitScript(noAutoOpen);
+  await page.goto('/index.html?view=output&room=ABC234');
+  await page.clock.runFor(500);
+  await expect(page.locator('.o-conn')).toContainText('Connecting to room ABC234');
+  await page.clock.runFor(16000);
+  await expect(page.locator('.o-conn')).toContainText('blocking WebRTC');
+});

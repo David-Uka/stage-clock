@@ -1080,6 +1080,8 @@ function openClientTransport({ role, onMessage, codeContainer }) {
       conn.on('error', () => {});
     };
     api.send = msg => { if (conn && conn.open) { conn.send(msg); return true; } return false; };
+    const SLOW_HINT = `Still connecting to room ${code}. If this never changes, this browser or network is blocking WebRTC: try another browser, switch off a VPN or shields, or use the relay transport from the Remote panel.`;
+    setTimeout(() => { if (!remote.connected && /^Connecting to room/.test(remote.label)) remote.label = SLOW_HINT; }, 15000);
     loadPeerJs().then(() => {
       peer = new Peer();
       peer.on('open', connect);
@@ -1134,7 +1136,7 @@ if (IS_OUTPUT) {
   const root = mountOutput($('#bigOutput'));
   $('#btnExitOverlay').textContent = 'Full screen';
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
-  document.addEventListener('keydown', ev => { if (ev.key === 'f' || ev.key === 'F') toggleFullscreen(); });
+  document.addEventListener('keydown', ev => { if ((ev.key === 'f' || ev.key === 'F') && !ev.metaKey && !ev.ctrlKey && !ev.altKey) toggleFullscreen(); });
   document.addEventListener('dblclick', toggleFullscreen);
   const isRemote = PARAMS.has('lan') || PARAMS.has('room') || PARAMS.has('relay');
   if (!isRemote) {
@@ -1191,6 +1193,8 @@ if (IS_REMOTE_VIEW) {
     pinOk = false; pinChecked = false; pinDirty = true; pinEl.classList.remove('bad');
     if (hasPin()) verifyPin(); else setPinMsg(PIN_INVITE, '');
   });
+  // No answer within a few seconds (not connected yet, message lost, controller busy): ask again.
+  setInterval(() => { if (hasPin() && !pinOk && !pinChecked) { pinDirty = true; verifyPin(); } }, 3000);
   function sendCommand(action, value) {
     if (!hasPin()) { setPinMsg(PIN_INVITE, 'bad'); pinEl.focus(); return; }
     const id = uid(); const msg = { type: 'command', id, action, value, pin: pinEl.value.trim() };
@@ -1226,7 +1230,7 @@ if (IS_REMOTE_VIEW) {
     c.classList.toggle('bad', !remote.connected); c.classList.toggle('ok', remote.connected);
     const locked = !pinOk;
     $('#rGrid').toggleAttribute('data-locked', locked); $('#rMsg').toggleAttribute('data-locked', locked);
-    $('#rLock').textContent = !locked ? '' : !hasPin() ? 'Tap any control to jump to the PIN field' : pinChecked ? 'Controls are locked until the PIN matches' : 'Checking the PIN…';
+    setText($('#rLock'), !locked ? '' : !remote.connected ? 'Controls unlock once this phone reaches the controller' : !hasPin() ? 'Tap any control to jump to the PIN field' : pinChecked ? 'Controls are locked until the PIN matches' : 'Checking the PIN…');
     requestAnimationFrame(tick);
   };
   tick();
@@ -1715,7 +1719,7 @@ document.addEventListener('keydown', ev => {
   const tag = (ev.target.tagName || '').toLowerCase();
   const typing = tag === 'input' || tag === 'textarea' || tag === 'select' || ev.target.isContentEditable || document.querySelector('dialog[open]');
   if (ev.key === 'Escape' && overlay.classList.contains('on')) { showOverlay(false); return; }
-  if (typing) return;
+  if (typing || ev.metaKey || ev.ctrlKey || ev.altKey) return;
   switch (ev.key) {
     case ' ': ev.preventDefault(); play(); break;
     case 'r': case 'R': reset(); break;

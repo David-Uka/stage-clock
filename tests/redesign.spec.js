@@ -47,6 +47,9 @@ test('shortcuts live behind the help button and the ? key, not on the main page'
 test('timer dialog: presets fill the thresholds and impossible values block Save', async ({ page }) => {
   await openWithState(page, stateWith([timer()]));
   await page.click('#btnAdd');
+  await expect(page.locator('#tMore')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#tStartAt')).toBeHidden();
+  await expect(page.locator('#tDelete')).toBeHidden();
   await page.fill('#tTitle', 'Panel');
   await page.click('[data-seg="tWarn"] [data-value="120"]');
   await page.click('[data-seg="tCrit"] [data-value="30"]');
@@ -149,4 +152,12 @@ test('nudging before Start keeps the show ready, and an armed Delete disarms whe
   await expect(card.locator('[data-act="del"]')).toHaveText('Delete');
   await card.locator('[data-act="del"]').click();
   expect((await readState(page)).timers).toHaveLength(2);
+});
+
+test('editing a timer that uses an advanced option opens More options with a summary', async ({ page }) => {
+  await openWithState(page, stateWith([timer({ title: 'Break', atZero: 'stop', trigger: 'scheduled', startAt: '15:30' })]));
+  await page.locator('#rundown .timer-card').first().locator('[data-act="edit"]').click();
+  await expect(page.locator('#tMore')).toHaveAttribute('open', '');
+  await expect(page.locator('#tMoreHint')).toHaveText('stops at zero · at 15:30');
+  await expect(page.locator('#tStartAt')).toHaveValue('15:30');
 });

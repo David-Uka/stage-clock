@@ -7,6 +7,7 @@ test('adds a timer through the dialog', async ({ page }) => {
   await page.fill('#tTitle', 'Closing remarks');
   await page.fill('#tSpeaker', 'Host');
   await page.fill('#tM', '7'); await page.fill('#tS', '30');
+  await page.click('#tMore summary');
   await page.click('[data-seg="tTrigger"] [data-value="scheduled"]');
   await page.fill('#tStartAt', '16:45');
   await page.click('#tSave');

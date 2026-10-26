@@ -46,6 +46,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -250,10 +251,16 @@ kbd { font-family: var(--font-mono); background: var(--panel-2); border: 1px sol
 .thresholds .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
 .thresholds .custom { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 220px; }
 .thresholds .custom[hidden] { display: none; }
-#tBar { height: 8px; border-radius: 4px; background: var(--track); margin-top: 4px; }
-.barlabels { position: relative; height: 16px; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
-.barlabels span { position: absolute; top: 2px; white-space: nowrap; }
-.barlabels .w { color: var(--warn); transform: translateX(-50%); } .barlabels .c { color: var(--crit); right: 0; }
+.hms.dur { max-width: 300px; }
+.field label .opt { font-weight: 400; color: var(--muted); opacity: .8; margin-left: 4px; }
+/* rarely changed timer settings live behind one disclosure */
+details.more { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 12px; }
+details.more summary { cursor: pointer; list-style: none; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; align-items: center; gap: 8px; user-select: none; }
+details.more summary::-webkit-details-marker { display: none; }
+details.more summary::before { content: '▸'; font-size: 11px; }
+details.more[open] summary::before { content: '▾'; }
+details.more summary:hover { color: var(--fg); }
+details.more .hint { font-weight: 400; }
 .foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; align-items: center; }
 .foot .left { margin-right: auto; }
 
@@ -696,45 +703,44 @@ body.remote-mode #remoteView { display: flex; }
 <dialog id="timerDialog">
   <h2 id="timerDialogTitle">Add timer</h2>
   <form class="form" id="timerForm" method="dialog">
-    <div class="field"><label for="tTitle">Title (shown at the top of the display)</label><input type="text" id="tTitle" placeholder="Opening keynote" required></div>
-    <div class="field"><label for="tSpeaker">Speaker / subtitle (shown at the bottom)</label><input type="text" id="tSpeaker" placeholder="Dr. Amara Okafor"></div>
     <div class="grid2">
-      <div class="field"><label>Duration</label>
-        <div class="hms">
-          <div><input type="number" id="tH" min="0" max="99" value="0" inputmode="numeric"><span>hours</span></div>
-          <div><input type="number" id="tM" min="0" max="59" value="20" inputmode="numeric"><span>min</span></div>
-          <div><input type="number" id="tS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div>
-        </div>
-      </div>
-      <div class="field"><label>Display</label>
-        <div class="seg fill" data-seg="tMode"><button type="button" data-value="down" aria-pressed="true">Count down to 0</button><button type="button" data-value="up" aria-pressed="false">Count up from 0</button></div>
-        <select id="tMode" hidden><option value="down">Count down to zero</option><option value="up">Count up from zero</option></select>
+      <div class="field"><label for="tTitle">Title</label><input type="text" id="tTitle" placeholder="Opening keynote" required></div>
+      <div class="field"><label for="tSpeaker">Speaker <span class="opt">optional</span></label><input type="text" id="tSpeaker" placeholder="Dr. Amara Okafor"></div>
+    </div>
+    <div class="field"><label>Duration</label>
+      <div class="hms dur">
+        <div><input type="number" id="tH" min="0" max="99" value="0" inputmode="numeric"><span>hours</span></div>
+        <div><input type="number" id="tM" min="0" max="59" value="20" inputmode="numeric"><span>min</span></div>
+        <div><input type="number" id="tS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div>
       </div>
     </div>
     <div class="thresholds">
       <div class="grid">
-        <label><i class="sw" style="background:var(--warn)"></i>Turn yellow with</label>
+        <label><i class="sw" style="background:var(--warn)"></i>Yellow at</label>
         <div class="row"><div class="seg" data-seg="tWarn"><button type="button" data-value="300">5 min left</button><button type="button" data-value="120">2 min</button><button type="button" data-value="60">1 min</button><button type="button" data-value="custom">Custom…</button></div>
           <div class="hms custom" id="tWarnCustom" hidden><div><input type="number" id="tWarnM" min="0" value="5" inputmode="numeric"><span>min</span></div><div><input type="number" id="tWarnS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div></div>
-        <label><i class="sw" style="background:var(--crit)"></i>Turn red with</label>
+        <label><i class="sw" style="background:var(--crit)"></i>Red at</label>
         <div class="row"><div class="seg" data-seg="tCrit"><button type="button" data-value="60">1 min left</button><button type="button" data-value="30">30 s</button><button type="button" data-value="custom">Custom…</button></div>
           <div class="hms custom" id="tCritCustom" hidden><div><input type="number" id="tCritM" min="0" value="1" inputmode="numeric"><span>min</span></div><div><input type="number" id="tCritS" min="0" max="59" value="0" inputmode="numeric"><span>sec</span></div></div></div>
       </div>
-      <div id="tBar"></div>
-      <div class="barlabels" id="tBarLabels"></div>
       <span class="hint bad" id="tValidation" hidden></span>
     </div>
-    <div class="grid2">
+    <details class="more" id="tMore">
+      <summary>More options <span class="hint" id="tMoreHint"></span></summary>
+      <div class="field"><label>Display</label>
+        <div class="seg fill" data-seg="tMode"><button type="button" data-value="down" aria-pressed="true">Count down</button><button type="button" data-value="up" aria-pressed="false">Count up</button></div>
+        <select id="tMode" hidden><option value="down">Count down to zero</option><option value="up">Count up from zero</option></select>
+      </div>
       <div class="field"><label>When time runs out</label>
-        <div class="seg fill" data-seg="tZero"><button type="button" data-value="continue" aria-pressed="true">Keep counting (+0:12)</button><button type="button" data-value="stop" aria-pressed="false">Stop at zero</button></div>
-        <select id="tZero" hidden><option value="continue">Keep counting overtime (+0:12)</option><option value="stop">Stop at zero</option></select>
+        <div class="seg fill" data-seg="tZero"><button type="button" data-value="continue" aria-pressed="true">Keep counting</button><button type="button" data-value="stop" aria-pressed="false">Stop at zero</button></div>
+        <select id="tZero" hidden><option value="continue">Keep counting overtime</option><option value="stop">Stop at zero</option></select>
       </div>
       <div class="field"><label>Start</label>
         <div class="seg fill" data-seg="tTrigger"><button type="button" data-value="manual" aria-pressed="true">Manually</button><button type="button" data-value="linked" aria-pressed="false">After previous</button><button type="button" data-value="scheduled" aria-pressed="false">At a time</button></div>
         <select id="tTrigger" hidden><option value="manual">Manually</option><option value="linked">When the previous timer ends</option><option value="scheduled">At a time of day</option></select>
-        <div class="row" style="flex-wrap:nowrap"><input type="time" id="tStartAt" aria-label="Start time" style="width:8em" disabled><span class="hint">Used when “At a time” is chosen</span></div>
+        <input type="time" id="tStartAt" aria-label="Start time" style="width:8em" hidden>
       </div>
-    </div>
+    </details>
     <div class="foot">
       <button type="button" class="btn small danger left" id="tDelete" hidden>Delete timer</button>
       <button type="button" class="btn" id="tCancel">Cancel</button>
@@ -1521,14 +1527,6 @@ function thresholdValues() {
 }
 function refreshThresholds() {
   const { duration, warnAt, critAt } = thresholdValues();
-  $('#tBar').style.background = thresholdBar(duration, warnAt, critAt);
-  const labels = $('#tBarLabels'); labels.innerHTML = '';
-  if (duration > 0) {
-    const add = (txt, cls, left) => { const s = document.createElement('span'); s.textContent = txt; s.className = cls; if (left !== undefined) s.style.left = left; labels.appendChild(s); };
-    add('0:00', '', '0');
-    if (warnAt > 0 && warnAt < duration) add(`${fmtDur(duration - warnAt)} · yellow`, 'w', `${((duration - warnAt) / duration * 100).toFixed(1)}%`);
-    if (critAt > 0) add(`${fmtDur(Math.max(0, duration - critAt))} · red`, 'c');
-  }
   let err = '';
   if (duration <= 0) err = 'Set a duration first.';
   else if (warnAt > duration || critAt > duration) err = `Longer than the timer: the timer is ${fmtDur(duration)}.`;
@@ -1551,7 +1549,9 @@ function openTimerDialog(t) {
   $('#tZero').value = t ? t.atZero : 'continue'; setSeg($('[data-seg="tZero"]'), $('#tZero').value);
   $('#tTrigger').value = t ? (t.trigger || 'manual') : 'manual'; setSeg($('[data-seg="tTrigger"]'), $('#tTrigger').value);
   $('#tStartAt').value = t ? (t.startAt || '') : '';
-  $('#tStartAt').disabled = $('#tTrigger').value !== 'scheduled';
+  $('#tStartAt').hidden = $('#tTrigger').value !== 'scheduled';
+  const extra = t ? [t.mode === 'up' && 'counts up', t.atZero === 'stop' && 'stops at zero', t.trigger === 'linked' && 'after previous', t.trigger === 'scheduled' && `at ${t.startAt}`].filter(Boolean) : [];
+  $('#tMore').open = extra.length > 0; $('#tMoreHint').textContent = extra.join(' · ');
   const del = $('#tDelete'); del.hidden = !t; delete del.dataset.confirm; del.textContent = 'Delete timer';
   refreshThresholds();
   timerDialog.showModal(); $('#tTitle').focus();
@@ -1567,8 +1567,8 @@ for (const which of Object.keys(PRESET_SEGS)) {
 ['#tH', '#tM', '#tS', '#tWarnM', '#tWarnS', '#tCritM', '#tCritS'].forEach(id => $(id).addEventListener('input', refreshThresholds));
 initSeg($('[data-seg="tMode"]'), v => { $('#tMode').value = v; });
 initSeg($('[data-seg="tZero"]'), v => { $('#tZero').value = v; });
-initSeg($('[data-seg="tTrigger"]'), v => { $('#tTrigger').value = v; $('#tStartAt').disabled = v !== 'scheduled'; if (v === 'scheduled') $('#tStartAt').focus(); });
-$('#tTrigger').addEventListener('change', () => { setSeg($('[data-seg="tTrigger"]'), $('#tTrigger').value); $('#tStartAt').disabled = $('#tTrigger').value !== 'scheduled'; });
+initSeg($('[data-seg="tTrigger"]'), v => { $('#tTrigger').value = v; $('#tStartAt').hidden = v !== 'scheduled'; if (v === 'scheduled') $('#tStartAt').focus(); });
+$('#tTrigger').addEventListener('change', () => { setSeg($('[data-seg="tTrigger"]'), $('#tTrigger').value); $('#tStartAt').hidden = $('#tTrigger').value !== 'scheduled'; });
 $('#timerForm').addEventListener('submit', ev => {
   ev.preventDefault();
   if (!refreshThresholds()) { $('#tM').focus(); return; }

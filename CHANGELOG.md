@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.1 (2026-10-26)
+
+- Room codes now go through a hosted relay by default, so displays and phone remotes connect on phone data and on venue Wi-Fi that keeps devices apart. The direct WebRTC path is still there as "Direct (WebRTC)", and the relay address can be swapped for your own.
+- Keyboard shortcuts are ignored while Cmd, Ctrl or Alt is held. Cmd+R used to reset the running timer a moment before the page reloaded.
+- Phone remote: says when it has not reached the controller instead of "Checking the PIN…", and re-sends the PIN check until the controller answers. Displays explain a connection that never completes.
+- Timer dialog trimmed to the essentials; display mode, at-zero rule and start rule live behind "More options".
+- Hidden elements always hide (the Delete button no longer shows when adding a timer).
+
 ## 1.4.0 (2026-10-26)
 
 - Redesigned controller: the state of the show (running, paused, over time, finished, scheduled) is shown the same way on the status bar, the preview frame, the active rundown card and the Start button.

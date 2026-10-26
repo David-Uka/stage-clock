@@ -592,9 +592,9 @@ body.remote-mode #remoteView { display: flex; }
           <span class="pinbox" title="Phones need this PIN to control the timer. Watching needs no PIN.">Control PIN <b id="pinValue"></b><button class="btn small" id="pinNew">New PIN</button></span>
         </summary>
         <div class="seg tabs" data-seg="transport" role="tablist">
+          <button data-transport="relay" aria-pressed="true">Room code</button>
+          <button data-transport="room" aria-pressed="false">Direct (WebRTC)</button>
           <button data-transport="lan" aria-pressed="false">Venue Wi-Fi</button>
-          <button data-transport="room" aria-pressed="true">Room code</button>
-          <button data-transport="relay" aria-pressed="false">Your own relay</button>
         </div>
 
         <section data-transport="lan" hidden>
@@ -618,7 +618,7 @@ body.remote-mode #remoteView { display: flex; }
           <details class="help"><summary><b>How this works</b><span>· same Wi-Fi, no internet needed</span></summary><p>The desktop app serves the display on this computer's network address. Any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi scans the code or opens the link. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.</p></details>
         </section>
 
-        <section data-transport="room">
+        <section data-transport="room" hidden>
           <div class="row" id="roomOff"><button class="btn primary" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
           <div id="roomOn" hidden>
             <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="roomKindHint">The QR and link open as a display</span></div>
@@ -632,15 +632,11 @@ body.remote-mode #remoteView { display: flex; }
               </div>
             </div>
           </div>
-          <details class="help"><summary><b>How this works</b><span>· needs internet on both ends · devices connect directly, PeerJS only introduces them</span></summary><p>The display opens the link, scans the code, or enters the six-character code at the Stage Clock website. The two devices then talk to each other directly over WebRTC. The public PeerJS service only introduces them and never sees the timer data.</p></details>
+          <details class="help"><summary><b>How this works</b><span>· devices connect to each other directly · fails on phone data and most venue Wi-Fi</span></summary><p><b>Use Room code unless you have a reason not to.</b> A direct connection needs both devices to reach each other, which phone networks and venue Wi-Fi often prevent; it is kept for networks where no relay is wanted.</p><p>The display opens the link, scans the code, or enters the six-character code at the Stage Clock website. The two devices then talk to each other directly over WebRTC. The public PeerJS service only introduces them and never sees the timer data.</p></details>
         </section>
 
-        <section data-transport="relay" hidden>
-          <div class="row" style="flex-wrap:nowrap">
-            <input type="text" id="relayUrl" placeholder="https://stage-clock-relay.example.workers.dev" aria-label="Relay URL">
-            <button class="btn primary" id="relayStart">Start relay room</button>
-          </div>
-          <span class="hint" id="relayError"></span>
+        <section data-transport="relay">
+          <div class="row"><button class="btn primary" id="relayStart">Start a room</button><span class="hint" id="relayError"></span></div>
           <div id="relayOn" hidden>
             <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="relay"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="relayKindHint">The QR and link open as a display</span></div>
             <div class="row" style="align-items:flex-start">
@@ -653,7 +649,11 @@ body.remote-mode #remoteView { display: flex; }
               </div>
             </div>
           </div>
-          <details class="help"><summary><b>How this works</b><span>· a relay server you run · no third party</span></summary><p>Same idea as a room code, but through a relay server you run: a free Cloudflare Worker from <code>relay/</code> in the repository. No third-party service sees the connection. Displays open the link or scan the code exactly like a room code.</p></details>
+          <details class="help"><summary><b>How this works</b><span>· needs internet on both ends · works on phone data and venue Wi-Fi</span></summary><p>The display or phone opens the link, scans the code, or enters the six-character code at the Stage Clock website. Both ends talk to a small relay server, so it works wherever there is internet, including phone data and hotel or venue Wi-Fi that keeps devices apart. The relay forwards the timer state and keeps only the latest message; no accounts, no logs.</p>
+            <div class="field" style="margin-top:8px"><label for="relayUrl">Relay address <span class="opt">change it to use your own</span></label>
+              <input type="text" id="relayUrl" placeholder="https://stage-clock-relay.example.workers.dev" aria-label="Relay URL">
+              <span class="hint">The default is the hosted relay. To run your own, deploy <code>relay/</code> from the repository to Cloudflare Workers (free) and paste its address here.</span></div>
+          </details>
         </section>
       </details>
     </section>
@@ -863,7 +863,7 @@ const DEFAULT_SETTINGS = {
   font: 'condensed', endStyle: 'flash', endText: "TIME'S UP",
   showTitle: true, showSpeaker: true, showClock: true, showNext: true, showProgress: true,
   clock24: true, hideHours: true,
-  relayUrl: '',
+  relayUrl: 'https://stage-clock-relay.stage-clock-relay.workers.dev',
   presets: ['Please wrap up', '5 minutes left', 'Q&A is next'],
 };
 const SAMPLE_TIMERS = [
@@ -886,6 +886,7 @@ function loadState() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) {
       const s = JSON.parse(raw); s.settings = { ...DEFAULT_SETTINGS, ...(s.settings || {}) };
+      if (!s.settings.relayUrl) s.settings.relayUrl = DEFAULT_SETTINGS.relayUrl;   // 1.4.0 saved an empty address
       if (!/^\d{4}$/.test(s.pin || '')) s.pin = newPin();
       if (typeof s.started !== 'boolean') {   // 1.3 saves: derive once, so a nudge before Start cannot flip Ready into Paused
         const t = (s.timers || []).find(x => x.id === s.activeId);
@@ -1748,7 +1749,7 @@ for (const which of ['lan', 'room', 'relay']) {
 }
 function showTransport(name) { setSeg($('[data-seg="transport"]'), name); $$('section[data-transport]').forEach(s => { s.hidden = s.dataset.transport !== name; }); }
 initSeg($('[data-seg="transport"]'), v => showTransport(v));
-showTransport(window.stageClock && window.stageClock.lanInfo ? 'lan' : 'room');
+showTransport(window.stageClock && window.stageClock.lanInfo ? 'lan' : 'relay');
 const counts = { lan: 0, room: 0, relay: 0 };
 function setClients(which, n) {
   counts[which] = n;
@@ -1839,7 +1840,7 @@ try { const saved = sessionStorage.getItem('stage-clock-room'); if (saved && sav
 
 /* --- remote displays anywhere: through the organiser's own relay --- */
 $('#relayUrl').value = state.settings.relayUrl || '';
-$('#relayUrl').addEventListener('change', () => { state.settings.relayUrl = $('#relayUrl').value.trim(); commit(); });
+$('#relayUrl').addEventListener('change', () => { state.settings.relayUrl = $('#relayUrl').value.trim() || DEFAULT_SETTINGS.relayUrl; $('#relayUrl').value = state.settings.relayUrl; commit(); });
 function relayShow() {
   $('#relayOn').hidden = false; $('#relayCode').textContent = relay.code;
   const url = viewLink(linkKind.relay, 'relay=' + encodeURIComponent(state.settings.relayUrl) + '&room=' + relay.code); $('#relayLink').value = url; drawQr($('#relayQr'), url);

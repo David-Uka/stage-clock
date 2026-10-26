@@ -36,13 +36,15 @@ The builds are not code-signed yet.
 
 The desktop app runs a small local server. Open **Remote displays** in the controller, and any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi can scan the QR code or open the link to show the speaker display. No internet needed. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.
 
-## Remote displays anywhere with a room code
+## Remote displays and phone remotes anywhere with a room code
 
-In **Remote displays**, click **Start a room**. The display device opens the link, scans the QR code, or opens <https://david-uka.github.io/stage-clock/?view=output&room=> and types the six-character code. Both ends need internet. The devices connect to each other directly over WebRTC; the public PeerJS service only introduces them and never sees the timer data.
+In **Remote displays**, click **Start a room**. The display or phone opens the link, scans the QR code, or opens <https://david-uka.github.io/stage-clock/?view=output&room=> and types the six-character code. Both ends need internet, and that is all: it works on phone data and on venue Wi-Fi that keeps devices apart, because both ends talk to a small relay server rather than to each other. The relay forwards the timer state and keeps only the latest message. No accounts, no logs.
 
-## Remote displays through your own relay
+The **Direct (WebRTC)** tab connects the two devices to each other with the public PeerJS service only introducing them. It needs both devices to reach each other, which phone networks and most venue Wi-Fi prevent, so use it only on a network where you do not want a relay in the path.
 
-If you would rather not depend on the public PeerJS service, deploy the relay in [`relay/`](relay/README.md) to Cloudflare Workers (free plan, about five minutes), paste its address into **Remote displays → Your own relay**, and click **Start relay room**. Displays open the link or scan the code, exactly like a room code.
+## Running your own relay
+
+The hosted relay is a Cloudflare Worker from [`relay/`](relay/README.md). To run your own, deploy that folder to Cloudflare Workers (free plan, about five minutes) and paste its address under **Remote displays → Room code → How this works → Relay address**.
 
 ## Remote control from a phone
 

@@ -49,11 +49,13 @@ test('controller hosts a relay room and a display joins through the link', async
   await expect(page.locator('#relayOn')).toBeHidden();
 });
 
-test('relay address is remembered and validated', async ({ page }) => {
+test('relay address: clearing it restores the hosted default, a bad one is rejected, a custom one is remembered', async ({ page }) => {
   await openWithState(page, stateWith([timer()]));
   await openTransport(page, 'relay');
-  await page.click('#relayStart');
-  await expect(page.locator('#relayError')).toHaveText('Enter the relay address first.');
+  const DEFAULT = 'https://stage-clock-relay.stage-clock-relay.workers.dev';
+  await expect(page.locator('#relayUrl')).toHaveValue(DEFAULT);
+  await page.fill('#relayUrl', ''); await page.locator('#relayUrl').blur();
+  await expect(page.locator('#relayUrl')).toHaveValue(DEFAULT);
   await page.fill('#relayUrl', 'not a url'); await page.click('#relayStart');
   await expect(page.locator('#relayError')).toContainText('not a valid URL');
   await page.fill('#relayUrl', 'https://relay.example.com/'); await page.locator('#relayUrl').blur();
@@ -65,4 +67,13 @@ test('relay address is remembered and validated', async ({ page }) => {
 test('display explains an incomplete relay link', async ({ page }) => {
   await page.goto('/index.html?view=output&relay=https://relay.example.com&room=');
   await expect(page.locator('.o-conn')).toContainText('incomplete');
+});
+
+test('room code goes through the hosted relay by default, also for a 1.4.0 save with an empty address', async ({ page }) => {
+  await openWithState(page, stateWith([timer()], { settings: { relayUrl: '' } }));
+  await page.evaluate(() => { document.getElementById('remotePanel').open = true; });
+  await expect(page.locator('[data-seg="transport"] [data-transport="relay"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('section[data-transport="relay"]')).toBeVisible();
+  await expect(page.locator('section[data-transport="room"]')).toBeHidden();
+  await expect(page.locator('#relayUrl')).toHaveValue('https://stage-clock-relay.stage-clock-relay.workers.dev');
 });

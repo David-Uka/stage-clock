@@ -18,5 +18,7 @@ const readState = page => page.evaluate(k => JSON.parse(localStorage.getItem(k))
 async function openTransport(page, name) {
   await page.evaluate(() => { document.getElementById('remotePanel').open = true; });
   await page.click(`[data-seg="transport"] [data-transport="${name}"]`);
+  // The relay address lives under the section's "How this works" disclosure.
+  if (name === 'relay') await page.evaluate(() => { document.querySelector('section[data-transport="relay"] details.help').open = true; });
 }
 module.exports = { KEY, timer, stateWith, openWithState, readState, openTransport };

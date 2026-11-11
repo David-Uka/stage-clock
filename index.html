@@ -1704,7 +1704,7 @@ $('#ioLoad').addEventListener('click', () => {
       warnAt: Math.max(0, +t.warnAt || 0), critAt: Math.max(0, +t.critAt || 0), mode: t.mode === 'up' ? 'up' : 'down', atZero: t.atZero === 'stop' ? 'stop' : 'continue', trigger: ['linked', 'scheduled'].includes(t.trigger) ? t.trigger : 'manual', startAt: /^\d{1,2}:\d{2}$/.test(t.startAt || '') ? t.startAt : '', done: false }));
     state.timers.forEach((t, i) => { if (d.timers[i] && d.timers[i].autoNext && state.timers[i + 1]) state.timers[i + 1].trigger = 'linked'; });
     if (d.settings) state.settings = { ...DEFAULT_SETTINGS, ...d.settings };
-    state.running = false; state.activeId = state.timers[0]?.id || null; state.remainingMs = (state.timers[0]?.duration || 0) * 1000;
+    state.running = false; state.started = false; state.activeId = state.timers[0]?.id || null; state.remainingMs = (state.timers[0]?.duration || 0) * 1000;
     ioDialog.close(); commit();
   } catch (e) { $('#ioHint').textContent = 'That is not a valid Stage Clock export. Check the JSON and try again.'; }
 });

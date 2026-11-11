@@ -39,6 +39,19 @@ test('migrates a saved 1.0 state on load', async ({ page }) => {
   expect(s.timers[0].autoNext).toBeUndefined();
 });
 
+test('importing a fresh rundown after starting a timer restores Ready', async ({ page }) => {
+  await openWithState(page, stateWith([timer()]));
+  await page.click('#btnPlay');
+  await page.click('#btnImport');
+  await page.fill('#ioText', JSON.stringify({ app: 'stage-clock', v: 1, timers: [timer({ title: 'New show', duration: 300 })] }));
+  await page.click('#ioLoad');
+  await expect(page.locator('#statusLine')).toHaveAttribute('data-state', 'ready');
+  await expect(page.locator('#btnPlay')).toHaveText('Start');
+  expect(await readState(page)).toMatchObject({ running: false, started: false, remainingMs: 300000 });
+  await page.reload();
+  await expect(page.locator('#statusLine')).toHaveAttribute('data-state', 'ready');
+});
+
 test('rejects a bad import without touching the rundown', async ({ page }) => {
   await openWithState(page, stateWith([timer({ title: 'Keep me' })]));
   await page.click('#btnImport');

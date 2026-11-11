@@ -388,23 +388,32 @@ details.help p { margin: 6px 0 0; padding: 10px 12px; border: 1px solid var(--li
 .output.stopped .o-time, .output.stopped .o-endtext { color: var(--o-crit); }
 .output.stopped .o-progress i { background: var(--o-crit); }
 .output.flashing { animation: identify .25s steps(2, start) 6; }
-/* Broadcast overlay (?view=output&overlay=1): transparent for an OBS / vMix browser source. */
+/* Broadcast overlay (?view=output&overlay=1): transparent for an OBS / vMix browser source.
+   The background never paints; every alert (over time, identify flash) is carried by the digits. */
 html.overlay-mode, html.overlay-mode body { background: transparent !important; }
 html.overlay-mode #btnExitOverlay { display: none; }
 .output.transparent { background: transparent !important; }
 .output.transparent .o-title, .output.transparent .o-clock, .output.transparent .o-time, .output.transparent .o-endtext, .output.transparent .o-speaker, .output.transparent .o-next, .output.transparent .o-message, .output.transparent .o-paused { text-shadow: 0 0 1.2cqh rgba(0, 0, 0, .55); }
-.output.transparent.over[data-end="flash"] { animation: none; background: transparent !important; }
-.output.transparent.over[data-end="flash"] .o-time, .output.transparent.over[data-end="flash"] .o-endtext { color: var(--o-crit); animation: textflash 1s steps(2, start) infinite; }
-.output.transparent .o-blackout { background: transparent; }
-.output.transparent.blackout .o-top, .output.transparent.blackout .o-mid, .output.transparent.blackout .o-bottom, .output.transparent.blackout .o-bar { visibility: hidden; }
+.output.transparent .o-message { background: rgba(0, 0, 0, .75); inset: 12cqh 8cqw; border-radius: 2cqh; }
 .output.transparent .o-conn { background: rgba(0, 0, 0, .75); border-radius: 1cqh; padding: 2cqh 3cqw; }
+.output.transparent.over { animation: none; background: transparent !important; }
+.output.transparent.over .o-time, .output.transparent.over .o-endtext { color: var(--o-crit); }
+.output.transparent.over[data-end="solid"] .o-title { color: var(--o-fg); }
+.output.transparent.over[data-end="solid"] .o-speaker, .output.transparent.over[data-end="solid"] .o-clock, .output.transparent.over[data-end="solid"] .o-next, .output.transparent.over[data-end="solid"] .o-paused { color: var(--o-dim); }
+.output.transparent.over[data-end="flash"] .o-time, .output.transparent.over[data-end="flash"] .o-endtext { color: var(--o-crit); animation: textflash 1s steps(2, start) infinite; }
+.output.transparent.flashing { animation: none; }
+.output.transparent.flashing .o-time { animation: identifyText .25s steps(2, start) 6; }
+.output.transparent .o-blackout { background: transparent; }
+.output.transparent.blackout .o-top, .output.transparent.blackout .o-mid, .output.transparent.blackout .o-bottom, .output.transparent.blackout .o-progress { visibility: hidden; }
 @keyframes bgflash { 0% { background: var(--o-crit); } 100% { background: var(--o-bg); } }
 @keyframes textflash { 0% { opacity: 1; } 100% { opacity: .15; } }
 @keyframes msgflash { 0% { opacity: 1; } 100% { opacity: .2; } }
 @keyframes identify { 0% { background: #fff; } 100% { background: var(--o-bg); } }
+@keyframes identifyText { 0% { opacity: 1; } 100% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) {
   .output.over[data-end="flash"] { animation: none; background: var(--o-crit); }
   .output.over[data-end="text"] .o-time { animation: none; }
+  .output.transparent.over[data-end="flash"] .o-time, .output.transparent.over[data-end="flash"] .o-endtext, .output.transparent.flashing .o-time { animation: none; }
 }
 .output.hide-title .o-title, .output.hide-speaker .o-speaker, .output.hide-clock .o-clock, .output.hide-next .o-next, .output.hide-progress .o-progress { visibility: hidden; }
 

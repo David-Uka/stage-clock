@@ -72,7 +72,18 @@ test('overlay link opens a transparent display that flashes its digits, not the 
   await page.evaluate(msg => window.__stageClock.applyRemote(msg), { type: 'state', state: s, sentAt: Date.now() });
   await expect(page.locator('#bigOutput')).toHaveClass(/blackout/);
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-mid')).visibility)).toBe('hidden');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-progress')).visibility)).toBe('hidden');
   expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-blackout')).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  // a message is a dark panel, not a black frame; the solid end style keeps red digits; Flash blinks the digits
+  s.blackout = false; s.message = { text: 'Wrap up', color: 'white', bold: false, upper: false, flash: false, on: true }; s.settings = { endStyle: 'solid' }; s.flashNonce = 7;
+  await page.evaluate(msg => window.__stageClock.applyRemote(msg), { type: 'state', state: s, sentAt: Date.now() });
+  await expect(page.locator('#bigOutput .o-message')).toHaveClass(/on/);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-message')).backgroundColor)).toBe('rgba(0, 0, 0, 0.75)');
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('bigOutput')).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-time')).color)).toBe('rgb(255, 45, 45)');
+  await expect(page.locator('#bigOutput')).toHaveClass(/flashing/);
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('bigOutput')).animationName)).toBe('none');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-time')).animationName)).toBe('identifyText');
 });
 
 test('the link kind switch offers the overlay on every transport', async ({ page }) => {

@@ -60,7 +60,7 @@ The desktop app answers HTTP requests on its venue Wi-Fi address (shown under **
 | `POST /api/load?value=<timer id>` | Load a timer by id (ids are in `GET /api/state`) |
 | `GET /api/state` · `GET /api` | Current state (no PIN), and the list of endpoints |
 
-Example from a shell: `curl -X POST -H "X-Pin: 1234" http://192.168.1.20:4455/api/next`. In Bitfocus Companion use the Generic HTTP module with a POST request and the `X-Pin` header; on a Stream Deck any plugin that calls a URL works. Answers are `{ "ok": true }`, or `{ "ok": false, "reason": "Wrong PIN" }` with status 403.
+Example from a shell: `curl -X POST -H "X-Pin: 1234" http://192.168.1.20:4455/api/next`. In Bitfocus Companion use the Generic HTTP module with a POST request and the `X-Pin` header; on a Stream Deck any plugin that calls a URL works. Answers are `{ "ok": true }`, or `{ "ok": false, "reason": "Wrong PIN" }` with status 403. Message flags take `1`, `true`, `yes` or `on`; anything else is off. After five wrong PINs in a minute the app refuses control from every remote for the rest of that minute (status 429), so the PIN cannot be guessed.
 
 ## Running your own relay
 

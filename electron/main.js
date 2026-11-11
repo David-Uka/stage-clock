@@ -39,7 +39,10 @@ function startServer(tryPort) {
       ws.on('message', data => {
         if (data.length > 16 * 1024 || !mainWin || mainWin.isDestroyed()) return;
         let msg; try { msg = JSON.parse(String(data)); } catch (e) { return; }
-        if (msg && msg.type === 'command') mainWin.webContents.send('stage-clock:command', { clientId: ws.id, msg });
+        if (!msg || msg.type !== 'command') return;
+        const secs = api.lockedFor();
+        if (secs) { ws.send(JSON.stringify({ type: 'ack', id: msg.id, ok: false, reason: api.lockReason(secs) })); return; }
+        mainWin.webContents.send('stage-clock:command', { clientId: ws.id, msg });
       });
       ws.on('close', () => { clients.delete(ws); broadcastClients(); });
       ws.on('error', () => {});
@@ -67,6 +70,7 @@ ipcMain.on('stage-clock:state', (_e, msg) => {
 ipcMain.handle('stage-clock:lan-info', () => ({ port, urls: lanUrls() }));
 ipcMain.on('stage-clock:reply', (_e, { clientId, msg }) => {
   if (api.reply(clientId, msg)) return;
+  if (msg && msg.ok === false && msg.reason === 'Wrong PIN') api.noteWrongPin();
   for (const ws of clients) { if (ws.id === clientId && ws.readyState === ws.OPEN) { ws.send(JSON.stringify(msg)); break; } }
 });
 

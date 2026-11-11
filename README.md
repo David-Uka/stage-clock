@@ -42,6 +42,26 @@ In **Remote displays**, click **Start a room**. The display or phone opens the l
 
 The **Direct (WebRTC)** tab connects the two devices to each other with the public PeerJS service only introducing them. It needs both devices to reach each other, which phone networks and most venue Wi-Fi prevent, so use it only on a network where you do not want a relay in the path.
 
+## Broadcast overlay for OBS, vMix or Wirecast
+
+Every display link has an **Overlay** variant (pick it next to the QR code, or add `&overlay=1` to any display link). It is the same display with a transparent background, so a browser source at 1920×1080 drops the timer straight onto the programme feed with no keying. Over time, the digits flash red instead of the whole screen, and Blackout hides the overlay entirely.
+
+## Stream Deck, Companion and other hardware
+
+The desktop app answers HTTP requests on its venue Wi-Fi address (shown under **Remote displays → Venue Wi-Fi**, port 4455). Send the control PIN in an `X-Pin` header, a `?pin=` query, or a JSON body.
+
+| Request | Does |
+|---|---|
+| `POST /api/start` · `/api/pause` · `/api/play` | Start, pause, or toggle the current timer |
+| `POST /api/next` · `/api/prev` · `/api/reset` | Move through the rundown, or reset the current timer |
+| `POST /api/nudge?value=60` | Add seconds (negative to remove) |
+| `POST /api/blackout` · `/api/flash` | Toggle blackout, or flash the display |
+| `POST /api/message?text=Wrap+up&color=red&bold=1` · `/api/hideMessage` | Show or hide a message |
+| `POST /api/load?value=<timer id>` | Load a timer by id (ids are in `GET /api/state`) |
+| `GET /api/state` · `GET /api` | Current state (no PIN), and the list of endpoints |
+
+Example from a shell: `curl -X POST -H "X-Pin: 1234" http://192.168.1.20:4455/api/next`. In Bitfocus Companion use the Generic HTTP module with a POST request and the `X-Pin` header; on a Stream Deck any plugin that calls a URL works. Answers are `{ "ok": true }`, or `{ "ok": false, "reason": "Wrong PIN" }` with status 403. Message flags take `1`, `true`, `yes` or `on`; anything else is off. After five wrong PINs in a minute the app refuses control from every remote for the rest of that minute (status 429), so the PIN cannot be guessed.
+
 ## Running your own relay
 
 The hosted relay is a Cloudflare Worker from [`relay/`](relay/README.md). To run your own, deploy that folder to Cloudflare Workers (free plan, about five minutes) and paste its address under **Remote displays → Room code → How this works → Relay address**.

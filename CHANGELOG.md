@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 (2026-11-11)
+
+- Overlay links: every display link has an Overlay variant with a transparent background for an OBS, vMix or Wirecast browser source. Over time the digits flash instead of the screen; messages sit in a dark panel; Blackout hides everything.
+- Desktop app: HTTP API on the venue Wi-Fi address for Stream Deck, Bitfocus Companion and other automation (`POST /api/next`, `/api/start`, `/api/pause`, `/api/nudge?value=60` and more, with the control PIN). After five wrong PINs in a minute, control from every remote is refused for the rest of the minute.
+- Importing a rundown after a timer had started now shows the imported show as ready instead of paused.
+
 ## 1.4.1 (2026-10-26)
 
 - Room codes now go through a hosted relay by default, so displays and phone remotes connect on phone data and on venue Wi-Fi that keeps devices apart. The direct WebRTC path is still there as "Direct (WebRTC)", and the relay address can be swapped for your own.

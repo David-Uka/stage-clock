@@ -27,6 +27,10 @@ test('controller applies commands with the right PIN and refuses the wrong one',
   await expect(page.locator('#msgText')).toHaveValue('Wrap up');
   expect(await run('next')).toEqual({ ok: true });
   expect((await readState(page)).timers[1].id).toBe((await readState(page)).activeId);
+  expect(await run('pause')).toEqual({ ok: true }); expect((await readState(page)).running).toBe(false);
+  expect(await run('pause')).toEqual({ ok: true }); expect((await readState(page)).running).toBe(false);
+  expect(await run('start')).toEqual({ ok: true }); expect((await readState(page)).running).toBe(true);
+  expect(await run('start')).toEqual({ ok: true }); expect((await readState(page)).running).toBe(true);
   expect(await run('reset', null, '0000')).toEqual({ ok: false, reason: 'Wrong PIN' });
   expect(await run('explode')).toEqual({ ok: false, reason: 'Unknown action' });
   expect(await run('nudge', 99999)).toEqual({ ok: true });

@@ -388,6 +388,16 @@ details.help p { margin: 6px 0 0; padding: 10px 12px; border: 1px solid var(--li
 .output.stopped .o-time, .output.stopped .o-endtext { color: var(--o-crit); }
 .output.stopped .o-progress i { background: var(--o-crit); }
 .output.flashing { animation: identify .25s steps(2, start) 6; }
+/* Broadcast overlay (?view=output&overlay=1): transparent for an OBS / vMix browser source. */
+html.overlay-mode, html.overlay-mode body { background: transparent !important; }
+html.overlay-mode #btnExitOverlay { display: none; }
+.output.transparent { background: transparent !important; }
+.output.transparent .o-title, .output.transparent .o-clock, .output.transparent .o-time, .output.transparent .o-endtext, .output.transparent .o-speaker, .output.transparent .o-next, .output.transparent .o-message, .output.transparent .o-paused { text-shadow: 0 0 1.2cqh rgba(0, 0, 0, .55); }
+.output.transparent.over[data-end="flash"] { animation: none; background: transparent !important; }
+.output.transparent.over[data-end="flash"] .o-time, .output.transparent.over[data-end="flash"] .o-endtext { color: var(--o-crit); animation: textflash 1s steps(2, start) infinite; }
+.output.transparent .o-blackout { background: transparent; }
+.output.transparent.blackout .o-top, .output.transparent.blackout .o-mid, .output.transparent.blackout .o-bottom, .output.transparent.blackout .o-bar { visibility: hidden; }
+.output.transparent .o-conn { background: rgba(0, 0, 0, .75); border-radius: 1cqh; padding: 2cqh 3cqw; }
 @keyframes bgflash { 0% { background: var(--o-crit); } 100% { background: var(--o-bg); } }
 @keyframes textflash { 0% { opacity: 1; } 100% { opacity: .15; } }
 @keyframes msgflash { 0% { opacity: 1; } 100% { opacity: .2; } }
@@ -599,7 +609,7 @@ body.remote-mode #remoteView { display: flex; }
 
         <section data-transport="lan" hidden>
           <div id="lanRemote" hidden>
-            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="lan"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="lanKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="lan"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="overlay" aria-pressed="false">Overlay</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="lanKindHint">The QR and link open as a display</span></div>
             <div class="row" style="align-items:flex-start">
               <div class="qr" id="lanQr" aria-label="QR code for the link"></div>
               <div class="field" style="flex:1 1 220px">
@@ -615,13 +625,14 @@ body.remote-mode #remoteView { display: flex; }
             <div style="flex:1"><b>Wi-Fi displays need the desktop app</b><span class="hint">It runs a small server on this computer so phones and tablets on the same network can open the display without internet. In the browser, use Open display window or a room code.</span></div>
             <a class="btn" href="https://github.com/David-Uka/stage-clock/releases/latest" target="_blank" rel="noopener">Download</a>
           </div>
+          <details class="help"><summary><b>Stream Deck, Companion and other hardware</b><span>· HTTP API on the same address</span></summary><p>The desktop app answers simple web requests on the address above, so a button on an Elgato Stream Deck, Bitfocus Companion or any automation can drive the show: <code>POST /api/next</code>, <code>/api/start</code>, <code>/api/pause</code>, <code>/api/reset</code>, <code>/api/prev</code>, <code>/api/blackout</code>, <code>/api/flash</code>, <code>/api/nudge?value=60</code> or <code>/api/message?text=Wrap+up</code>, with the control PIN in an <code>X-Pin</code> header or <code>?pin=</code>. <code>GET /api/state</code> returns the current state, and <code>GET /api</code> lists everything. The README has examples.</p></details>
           <details class="help"><summary><b>How this works</b><span>· same Wi-Fi, no internet needed</span></summary><p>The desktop app serves the display on this computer's network address. Any phone, tablet, laptop or Raspberry Pi on the same Wi-Fi scans the code or opens the link. Windows may ask once to allow Stage Clock through the firewall; allow it for private networks.</p></details>
         </section>
 
         <section data-transport="room" hidden>
           <div class="row" id="roomOff"><button class="btn primary" id="roomStart">Start a room</button><span class="hint" id="roomError"></span></div>
           <div id="roomOn" hidden>
-            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="roomKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="room"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="overlay" aria-pressed="false">Overlay</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="roomKindHint">The QR and link open as a display</span></div>
             <div class="row" style="align-items:flex-start">
               <div class="qr" id="roomQr" aria-label="QR code for the room link"></div>
               <div class="field" style="flex:1 1 220px">
@@ -638,7 +649,7 @@ body.remote-mode #remoteView { display: flex; }
         <section data-transport="relay">
           <div class="row"><button class="btn primary" id="relayStart">Start a room</button><span class="hint" id="relayError"></span></div>
           <div id="relayOn" hidden>
-            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="relay"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="relayKindHint">The QR and link open as a display</span></div>
+            <div class="row" style="justify-content:space-between;margin-bottom:8px"><div class="seg" data-seg="relay"><button data-kind="output" aria-pressed="true">Display</button><button data-kind="overlay" aria-pressed="false">Overlay</button><button data-kind="remote" aria-pressed="false">Remote control</button></div><span class="hint" id="relayKindHint">The QR and link open as a display</span></div>
             <div class="row" style="align-items:flex-start">
               <div class="qr" id="relayQr" aria-label="QR code for the relay link"></div>
               <div class="field" style="flex:1 1 220px">
@@ -1125,9 +1136,11 @@ function relaySocketUrl(relay, code, role) {
   u.pathname = u.pathname.replace(/\/$/, '') + '/room/' + code; u.search = '?role=' + role; u.hash = '';
   return u.toString();
 }
-function viewLink(view, params) {
+// kind: 'output' (speaker display), 'overlay' (transparent display for a browser source), 'remote' (phone)
+function kindQuery(kind) { return kind === 'overlay' ? 'view=output&overlay=1' : 'view=' + kind; }
+function viewLink(kind, params) {
   const base = /^https?:$/.test(location.protocol) ? location.origin + location.pathname : PUBLIC_URL;
-  return base + '?view=' + view + '&' + params;
+  return base + '?' + kindQuery(kind) + '&' + params;
 }
 
 /* ============ OUTPUT-ONLY WINDOW (?view=output) ============ */
@@ -1135,6 +1148,7 @@ if (IS_OUTPUT) {
   document.body.classList.add('output-mode');
   document.title = 'Stage Clock · Display';
   const root = mountOutput($('#bigOutput'));
+  if (PARAMS.has('overlay')) { document.documentElement.classList.add('overlay-mode'); root.classList.add('transparent'); document.title = 'Stage Clock · Overlay'; }
   $('#btnExitOverlay').textContent = 'Full screen';
   $('#btnExitOverlay').addEventListener('click', toggleFullscreen);
   document.addEventListener('keydown', ev => { if ((ev.key === 'f' || ev.key === 'F') && !ev.metaKey && !ev.ctrlKey && !ev.altKey) toggleFullscreen(); });
@@ -1307,6 +1321,8 @@ function applyCommand(msg) {
   const v = msg.value;
   switch (msg.action) {
     case 'play': play(); break;
+    case 'start': if (!state.running) play(); break;
+    case 'pause': if (state.running) play(); break;
     case 'reset': reset(); break;
     case 'next': step(1); break;
     case 'prev': step(-1); break;
@@ -1743,7 +1759,7 @@ const linkKind = { lan: 'output', room: 'output', relay: 'output', onChange: {} 
 for (const which of ['lan', 'room', 'relay']) {
   initSeg($(`.seg[data-seg="${which}"]`), kind => {
     linkKind[which] = kind;
-    $(`#${which}KindHint`).textContent = kind === 'remote' ? 'The QR and link open as a phone remote' : 'The QR and link open as a display';
+    $(`#${which}KindHint`).textContent = kind === 'remote' ? 'The QR and link open as a phone remote' : kind === 'overlay' ? 'Transparent display for an OBS or vMix browser source (1920×1080)' : 'The QR and link open as a display';
     if (linkKind.onChange[which]) linkKind.onChange[which]();
   });
 }
@@ -1778,7 +1794,7 @@ function setupLanRemote() {
     const sel = $('#lanAddr'); sel.innerHTML = '';
     info.urls.forEach(u => { const o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); });
     sel.hidden = info.urls.length < 2;
-    const show = () => { const url = sel.value + '/?view=' + linkKind.lan + '&lan=1'; $('#lanUrl').value = url; drawQr($('#lanQr'), url); };
+    const show = () => { const url = sel.value + '/?' + kindQuery(linkKind.lan) + '&lan=1'; $('#lanUrl').value = url; drawQr($('#lanQr'), url); };
     sel.addEventListener('change', show); show(); linkKind.onChange.lan = show;
     pushRemote();
   }).catch(() => {});

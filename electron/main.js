@@ -6,6 +6,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const { createApi } = require('./api');
 
 const APP_DIR = path.join(__dirname, 'app');
 const PORT = 4455;
@@ -13,6 +14,8 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 
 let mainWin = null, lastMessage = null, port = null, nextClientId = 1;
 const clients = new Set();
+// Stream Deck / Companion: HTTP requests become the same commands a phone remote sends; the controller page answers.
+const api = createApi({ lastMessage: () => lastMessage, newClientId: () => nextClientId++, sendCommand: (clientId, msg) => { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('stage-clock:command', { clientId, msg }); } });
 
 /* ---- local display server ---- */
 function serveStatic(req, res) {
@@ -26,7 +29,7 @@ function serveStatic(req, res) {
 function broadcastClients() { if (mainWin && !mainWin.isDestroyed()) mainWin.webContents.send('stage-clock:clients', clients.size); }
 function startServer(tryPort) {
   return new Promise(resolve => {
-    const server = http.createServer(serveStatic);
+    const server = http.createServer(async (req, res) => { if (!(await api.handle(req, res))) serveStatic(req, res); });
     const wss = new WebSocketServer({ server, path: '/ws' });
     wss.on('connection', ws => {
       ws.id = nextClientId++;
@@ -63,6 +66,7 @@ ipcMain.on('stage-clock:state', (_e, msg) => {
 });
 ipcMain.handle('stage-clock:lan-info', () => ({ port, urls: lanUrls() }));
 ipcMain.on('stage-clock:reply', (_e, { clientId, msg }) => {
+  if (api.reply(clientId, msg)) return;
   for (const ws of clients) { if (ws.id === clientId && ws.readyState === ws.OPEN) { ws.send(JSON.stringify(msg)); break; } }
 });
 

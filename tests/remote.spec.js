@@ -54,3 +54,34 @@ test('controller with the desktop bridge shows the link, QR code and client coun
   expect(last.state.running).toBe(true);
   expect(typeof last.sentAt).toBe('number');
 });
+
+test('overlay link opens a transparent display that flashes its digits, not the screen', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.goto('/index.html?view=output&lan=1&overlay=1');
+  await expect(page.locator('#bigOutput')).toHaveClass(/transparent/);
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('bigOutput')).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  await expect(page.locator('#btnExitOverlay')).toBeHidden();
+  const t = timer({ title: 'Overlay keynote', duration: 60 });
+  const s = stateWith([t], { running: true }); s.endAt = Date.now() - 5000;   // already over time
+  await page.evaluate(msg => window.__stageClock.applyRemote(msg), { type: 'state', state: s, sentAt: Date.now() });
+  await expect(page.locator('#bigOutput')).toHaveClass(/over/);
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('bigOutput')).animationName)).toBe('none');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-time')).animationName)).toBe('textflash');
+  s.blackout = true;
+  await page.evaluate(msg => window.__stageClock.applyRemote(msg), { type: 'state', state: s, sentAt: Date.now() });
+  await expect(page.locator('#bigOutput')).toHaveClass(/blackout/);
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-mid')).visibility)).toBe('hidden');
+  expect(await page.evaluate(() => getComputedStyle(document.querySelector('#bigOutput .o-blackout')).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+});
+
+test('the link kind switch offers the overlay on every transport', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.stageClock = { publish: () => {}, lanInfo: () => Promise.resolve({ port: 4455, urls: ['http://192.168.1.20:4455'] }), onClients: () => {} };
+  });
+  await openWithState(page, stateWith([timer()]));
+  await openTransport(page, 'lan');
+  await page.click('.seg[data-seg="lan"] [data-kind="overlay"]');
+  await expect(page.locator('#lanUrl')).toHaveValue('http://192.168.1.20:4455/?view=output&overlay=1&lan=1');
+  await expect(page.locator('#lanKindHint')).toContainText('OBS');
+});
